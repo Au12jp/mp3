@@ -6,21 +6,32 @@ const ffmpeg = createFFmpeg({
   log: true, // ログを有効化
 });
 
-const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+// DOM要素を取得し、nullチェックを追加
+const fileInput = document.getElementById(
+  "fileInput"
+) as HTMLInputElement | null;
 const convertButton = document.getElementById(
   "convertButton"
-) as HTMLButtonElement;
-const output = document.getElementById("output") as HTMLElement;
+) as HTMLButtonElement | null;
+const output = document.getElementById("output") as HTMLElement | null;
+
+// nullチェック
+if (!fileInput || !convertButton || !output) {
+  console.error("必要なDOM要素が見つかりません。");
+  throw new Error("必要なDOM要素が見つかりません。");
+}
 
 convertButton.addEventListener("click", async () => {
-  if (!fileInput.files?.length) {
-    alert("Please select an mp3 file.");
+  // fileInput.filesがnullまたはファイルが選択されていない場合のチェック
+  if (!fileInput.files || fileInput.files.length === 0) {
+    alert("MP3ファイルを選択してください。");
     return;
   }
 
-  const file = fileInput.files[0];
-  output.textContent = "Converting...";
+  const file = fileInput.files[0]; // 最初のファイルを取得
+  output.textContent = "変換中...";
 
+  // ffmpegのロード
   if (!ffmpeg.isLoaded()) {
     await ffmpeg.load();
   }
@@ -37,32 +48,32 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // astatsフィルタを使って、周波数解析の結果を出力
+    // FFTフィルタを使用して周波数解析を行い、結果を保存
     await ffmpeg.run(
       "-i",
       "input.mp3",
-      "-af",
+      "-filter_complex",
       "astats=metadata=1:reset=1",
       "-f",
       "null",
       "-"
     );
 
-    // ログ情報をテキストファイルとして保存する
-    const textBlob = new Blob([ffmpegLog], { type: "text/plain" });
-    const textURL = URL.createObjectURL(textBlob);
+    output.textContent = "FFT解析完了！";
 
-    // ダウンロードリンクを生成
+    // FFT結果をテキストファイルとして保存する
+    const data = ffmpeg.FS("readFile", "output.txt");
+    const blob = new Blob([data.buffer], { type: "text/plain" });
+    const textURL = URL.createObjectURL(blob);
+
+    // テキスト結果をダウンロードリンクとして表示
     const link = document.createElement("a");
     link.href = textURL;
     link.download = "frequency_analysis.txt";
-    link.textContent = "Download Frequency Analysis";
-    output.innerHTML = ""; // 一度クリア
+    link.textContent = "FFT結果をダウンロード";
     output.appendChild(link);
-
-    output.innerHTML += "\nConversion complete!";
   } catch (error) {
-    output.textContent = "Error occurred during conversion.";
+    output.textContent = "変換中にエラーが発生しました。";
     console.error("FFmpeg error:", error);
     console.error("FFmpeg log:", ffmpegLog);
   }
