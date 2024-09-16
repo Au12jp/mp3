@@ -1,19 +1,18 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
-// FFmpegのインスタンスを作成
-const ffmpeg = createFFmpeg({ log: true });
+const ffmpeg = createFFmpeg({
+  log: true, // ログを有効化
+});
 
-// HTML要素の参照を取得
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
 ) as HTMLButtonElement;
 const output = document.getElementById("output") as HTMLElement;
 
-// 変換ボタンがクリックされたときの処理
 convertButton.addEventListener("click", async () => {
   if (!fileInput.files?.length) {
-    alert("Please select an MP3 file.");
+    alert("Please select an mp3 file.");
     return;
   }
 
@@ -24,10 +23,10 @@ convertButton.addEventListener("click", async () => {
     await ffmpeg.load();
   }
 
-  // MP3ファイルをFFmpegのファイルシステムに書き込み
+  // MP3ファイルを書き込み
   ffmpeg.FS("writeFile", "input.mp3", await fetchFile(file));
 
-  // FFmpegのログを取得
+  // FFmpegのログを解析するために標準エラー出力をキャプチャする
   let ffmpegLog = "";
   ffmpeg.setLogger(({ type, message }) => {
     if (type === "fferr" || type === "ffout") {
@@ -36,74 +35,46 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // MP3全体を解析し、周波数スペクトルの画像を生成
+    // astatsフィルタを使い、全フレームの情報を出力
     await ffmpeg.run(
       "-i",
       "input.mp3",
-      "-filter_complex",
-      "showfreqs=s=320x180:mode=line", // 解像度320x180で周波数スペクトルを描画
-      "output_%d.png" // フレームごとにPNG画像を生成
+      "-af",
+      "astats=metadata=1:reset=1", // 各フレームごとの音声情報を取得
+      "-f",
+      "null",
+      "-"
     );
 
+    // ログ解析して必要な情報を抽出
+    const logData = ffmpegLog.split("\n");
     let dataOutput: string[] = [];
-    let frameIndex = 1;
 
-    // フレーム画像を順次処理
-    while (true) {
-      try {
-        // 画像ファイル名の生成
-        const fileName = `output_${frameIndex}.png`;
-        const data = ffmpeg.FS("readFile", fileName); // FFmpegのファイルシステムから画像を読み込み
-        const blob = new Blob([data.buffer], { type: "image/png" });
-        const imgURL = URL.createObjectURL(blob);
+    logData.forEach((line) => {
+      if (line.includes("Parsed_astats")) {
+        const timestampMatch = line.match(/t:(\d+\.\d+)/); // タイムスタンプを取得
+        const meanVolumeMatch = line.match(/mean_volume:([-]?\d+\.\d+)/); // 平均音量を取得
+        const peakVolumeMatch = line.match(/peak_volume:([-]?\d+\.\d+)/); // ピーク音量を取得
+        const frequencyMatch = line.match(/freq:[\d\s]+/); // 周波数情報を取得（必要に応じて）
 
-        // 画像をHTMLのimg要素に表示して処理
-        const img = document.createElement("img");
-        img.src = imgURL;
-        await new Promise((resolve) => (img.onload = resolve)); // 画像の読み込みを待機
+        if (timestampMatch && meanVolumeMatch && peakVolumeMatch) {
+          const timestamp = parseFloat(timestampMatch[1]);
+          const meanVolume = parseFloat(meanVolumeMatch[1]);
+          const peakVolume = parseFloat(peakVolumeMatch[1]);
 
-        // Canvasで画像を描画してピクセルデータを取得
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx!.drawImage(img, 0, 0);
-
-        // 画像データの解析
-        const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-        const pixels = imageData.data;
-
-        // ピクセルの輝度（明るさ）を計算して音量と周波数情報を抽出
-        let sumLuminance = 0;
-        for (let j = 0; j < pixels.length; j += 4) {
-          const r = pixels[j];
-          const g = pixels[j + 1];
-          const b = pixels[j + 2];
-          const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-          sumLuminance += luminance;
+          dataOutput.push(
+            `Time: ${timestamp}s, Mean Volume: ${meanVolume}dB, Peak Volume: ${peakVolume}dB\n`
+          );
         }
-
-        // フレームごとの時間(ms)、周波数、音量を仮計算
-        const timeMs = frameIndex * (1000 / 30); // 30fps基準での時間
-        const frequency = (canvas.height / 2) * (sumLuminance / pixels.length); // 仮の周波数計算
-        const volume = sumLuminance / (canvas.width * canvas.height); // 仮の音量計算
-
-        // 結果を保存
-        dataOutput.push(
-          `Time: ${timeMs}ms, Frequency: ${frequency}Hz, Volume: ${volume}\n`
-        );
-        frameIndex++;
-      } catch (error) {
-        // フレームがなくなったら終了
-        break;
       }
-    }
+    });
 
-    // 解析結果をテキストファイルとして保存
+    // 解析結果をテキストファイルとして出力
     const blob = new Blob([dataOutput.join("")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
+    console.warn(url);
     link.download = "audio_analysis.txt";
     link.textContent = "Download Analysis Results";
     output.appendChild(link);
@@ -112,6 +83,5 @@ convertButton.addEventListener("click", async () => {
   } catch (error) {
     output.textContent = "Error occurred during conversion.";
     console.error("FFmpeg error:", error);
-    console.error("FFmpeg log:", ffmpegLog);
   }
 });
