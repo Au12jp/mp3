@@ -2,6 +2,30 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
+const ffmpeg = new FFmpeg();
+
+const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
+
+// Async function to handle the loading of URLs
+async function loadFFmpeg() {
+  const config: FFMessageLoadConfig = {
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"), // Await the Promise to get the string
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"), // Await the Promise
+    workerURL: await toBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ), // Await the Promise
+  };
+
+  console.warn(config);
+
+  // Load ffmpeg with the resolved config
+  await ffmpeg.load(config);
+}
+
+// Call the async function
+loadFFmpeg().catch(console.error);
+
 // HTML要素を取得
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const trimButton = document.getElementById("trimButton") as HTMLButtonElement;
@@ -28,23 +52,6 @@ async function trimVideo(
   startTime: string,
   endTime: string
 ): Promise<string | null> {
-  const ffmpeg = new FFmpeg();
-
-  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
-
-  const config: FFMessageLoadConfig = {
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.worker.js`,
-      "text/javascript"
-    ),
-  };
-
-  console.warn(config);
-
-  await ffmpeg.load(config);
-
   console.warn("ffmpeg loaded");
 
   // 入力ファイルをFFmpegの仮想ファイルシステムに書き込み
