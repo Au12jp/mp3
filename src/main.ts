@@ -1,7 +1,5 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
-console.log(2);
-
 const ffmpeg = createFFmpeg({
   log: true, // ログを有効化
 });
@@ -37,78 +35,30 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // MP3の周波数解析映像を出力
+    // 音声統計情報（周波数含む）をテキスト出力
     await ffmpeg.run(
       "-i",
       "input.mp3",
       "-filter_complex",
-      "showfreqs=s=1280x720:mode=line",
-      "-frames:v",
-      "100", // 100フレーム生成
-      "output_%03d.png"
+      "astats=metadata=1:reset=1",
+      "-f",
+      "null",
+      "-"
     );
 
-    // 100フレーム分の画像ファイルを読み込んで比較する
-    let maxDiff = 0;
-    let bestFrame = null;
+    // FFmpegのログ情報をテキストとして表示
+    const textBlob = new Blob([ffmpegLog], { type: "text/plain" });
+    const textURL = URL.createObjectURL(textBlob);
 
-    for (let i = 1; i <= 100; i++) {
-      const fileName = `output_${String(i).padStart(3, "0")}.png`;
-      const data = ffmpeg.FS("readFile", fileName);
-      const blob = new Blob([data.buffer], { type: "image/png" });
-      const imgURL = URL.createObjectURL(blob);
+    // 結果をテキストとして表示
+    const textElement = document.createElement("a");
+    textElement.href = textURL;
+    textElement.download = "frequency_analysis.txt";
+    textElement.textContent = "Download Frequency Analysis";
+    output.textContent = "";
+    output.appendChild(textElement);
 
-      // Canvasで画像を描画してピクセルデータを取得
-      const img = document.createElement("img");
-      img.src = imgURL;
-      await new Promise((resolve) => (img.onload = resolve)); // 画像の読み込みを待機
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx!.drawImage(img, 0, 0);
-
-      const imageData = ctx!.getImageData(0, 0, canvas.width, canvas.height);
-      const pixels = imageData.data;
-
-      // ピクセルの輝度を計算
-      let sumLuminance = 0;
-      for (let j = 0; j < pixels.length; j += 4) {
-        const r = pixels[j];
-        const g = pixels[j + 1];
-        const b = pixels[j + 2];
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        sumLuminance += luminance;
-      }
-
-      // 輝度が一番大きいフレームを保存
-      if (sumLuminance > maxDiff) {
-        maxDiff = sumLuminance;
-        bestFrame = imgURL;
-      }
-    }
-
-    if (bestFrame) {
-      // 最も変動の大きいフレームを表示
-      const bestImg = document.createElement("img");
-      console.log(bestFrame);
-      bestImg.src = bestFrame;
-      bestImg.style.width = "100%";
-      bestImg.style.height = "auto";
-      output.appendChild(bestImg);
-
-      // ダウンロードリンクを生成
-      const link = document.createElement("a");
-      link.href = bestFrame;
-      link.download = "best_frame.png";
-      link.textContent = "Download Best Frame";
-      output.appendChild(link);
-
-      output.textContent = "Conversion complete!";
-    } else {
-      output.textContent = "No significant frame detected.";
-    }
+    output.textContent += "\nConversion complete!";
   } catch (error) {
     output.textContent = "Error occurred during conversion.";
     console.error("FFmpeg error:", error);
