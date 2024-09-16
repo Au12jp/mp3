@@ -44,10 +44,16 @@ echo "Deploying to GitHub Pages..."
 # gh-pagesブランチの最新デプロイだけを保持するために、リモートのgh-pagesブランチを上書き
 git push --force origin main:gh-pages
 
-# ローカルおよびリモートの不要なGitオブジェクトをクリーンアップ
+# 古いデプロイメントを削除する前に、アクティブなデプロイメントを無効化
 echo "Cleaning up old deployments..."
-git reflog expire --expire=now --all
-git gc --prune=now --aggressive
+for ID in $(gh api -X GET /repos/${REPO}/deployments?environment=${ENVIRONMENT// /%20} | jq -r ".[] | .id")
+do
+  echo "Setting deployment ID $ID to inactive"
+  gh api -X PATCH /repos/${REPO}/deployments/$ID -f state=inactive
+
+  echo "Deleting deployment ID: $ID"
+  gh api -X DELETE /repos/${REPO}/deployments/$ID
+done
 
 # リモートの不要なブランチや履歴をクリーンアップ
 git push origin --prune
