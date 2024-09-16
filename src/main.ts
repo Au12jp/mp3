@@ -12,13 +12,14 @@ const output = document.getElementById("output") as HTMLElement;
 
 convertButton.addEventListener("click", async () => {
   if (!fileInput.files?.length) {
-    alert("Please select an mp3 file.");
+    alert("Please select an MP3 file.");
     return;
   }
 
   const file = fileInput.files[0];
   output.textContent = "Processing...";
 
+  // FFmpegの準備ができているか確認
   if (!ffmpeg.isLoaded()) {
     await ffmpeg.load();
   }
@@ -30,12 +31,13 @@ convertButton.addEventListener("click", async () => {
   let ffmpegLog = "";
   ffmpeg.setLogger(({ type, message }) => {
     if (type === "fferr" || type === "ffout") {
+      console.log(`[${type}] ${message}`); // デバッグ用ログ出力
       ffmpegLog += message + "\n";
     }
   });
 
   try {
-    // astatsで音量情報を取得し、showspectrumで周波数を解析
+    // astatsとshowspectrumフィルタを適用して、MP3ファイルを解析
     await ffmpeg.run(
       "-i",
       "input.mp3",
@@ -46,16 +48,17 @@ convertButton.addEventListener("click", async () => {
       "-"
     );
 
-    // ログ解析して必要な情報を抽出
+    // ログデータを解析して必要な情報を抽出
     const logData = ffmpegLog.split("\n");
     let dataOutput: string[] = [];
 
     logData.forEach((line) => {
       // 音量情報の取得
       if (line.includes("Parsed_astats")) {
-        const timestampMatch = line.match(/t:(\d+\.\d+)/); // タイムスタンプを取得
-        const meanVolumeMatch = line.match(/mean_volume:([-]?\d+\.\d+)/); // 平均音量を取得
-        const peakVolumeMatch = line.match(/peak_volume:([-]?\d+\.\d+)/); // ピーク音量を取得
+        console.log("Processing astats line:", line); // 確認用出力
+        const timestampMatch = line.match(/t:(\d+\.\d+)/);
+        const meanVolumeMatch = line.match(/mean_volume:([-]?\d+\.\d+)/);
+        const peakVolumeMatch = line.match(/peak_volume:([-]?\d+\.\d+)/);
 
         if (timestampMatch && meanVolumeMatch && peakVolumeMatch) {
           const timestamp = parseFloat(timestampMatch[1]);
@@ -70,7 +73,7 @@ convertButton.addEventListener("click", async () => {
 
       // 周波数情報の取得
       if (line.includes("showspectrum")) {
-        const spectrumMatch = line.match(/freq=(\d+)/); // 仮の周波数を取得
+        const spectrumMatch = line.match(/freq=(\d+)/); // 仮の周波数情報
         if (spectrumMatch) {
           const frequency = parseFloat(spectrumMatch[1]);
           dataOutput.push(` Frequency: ${frequency}Hz\n`);
@@ -78,68 +81,47 @@ convertButton.addEventListener("click", async () => {
       }
     });
 
-    // 解析結果をテキストファイルとして出力
+    console.log("Data Output:", dataOutput); // 抽出されたデータの確認
+
+    // データをテキストファイルとして出力
     const blob = new Blob([dataOutput.join("")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
 
-    // ダウンロードリンクを生成
+    // ダウンロードリンクを生成してテキストファイルを保存
     const link = document.createElement("a");
     link.href = url;
-    link.download = "audio_analysis.txt"; // ダウンロードファイル名
-    link.style.display = "none"; // リンクを非表示にする
-    document.body.appendChild(link); // ダウンロードリンクをページに追加
-    link.click(); // ダウンロードを自動的にトリガー
-    document.body.removeChild(link); // ダウンロード後にリンクを削除
+    link.download = "audio_analysis.txt";
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 
-    output.textContent = "Conversion complete!";
-
-    // Step 2: テキストファイルからMP3生成
-    // 生成された音量・周波数データを使って新しいMP3を作成
-    await generateMP3(dataOutput);
-  } catch (error) {
-    output.textContent = "Error occurred during conversion.";
-    console.error("FFmpeg error:", error);
-  }
-});
-
-// MP3生成のための関数
-async function generateMP3(dataOutput: string[]) {
-  // MP3生成用のFFmpegコマンドを実行
-  let audioData = "";
-
-  dataOutput.forEach((line) => {
-    const matches = line.match(/Frequency: (\d+)Hz/);
-    if (matches) {
-      const frequency = matches[1];
-      // ここで、周波数に応じたサウンドデータを生成（仮の処理）
-      audioData += `sine=${frequency}\n`;
-    }
-  });
-
-  try {
-    // 仮のサウンドデータで新しいMP3を生成
+    // 解析された情報に基づいて新しいMP3を作成
     await ffmpeg.run(
       "-f",
       "lavfi",
       "-i",
-      `sine=frequency=1000:duration=10`, // 例として、1000Hzの音を10秒間生成
+      "sine=frequency=1000:duration=10",
       "output.mp3"
     );
 
-    // 生成されたMP3を読み込み
-    const mp3Data = ffmpeg.FS("readFile", "output.mp3");
+    // MP3ファイルをダウンロードリンクとして提供
+    const mp3Blob = ffmpeg.FS("readFile", "output.mp3");
+    const mp3Url = URL.createObjectURL(
+      new Blob([mp3Blob.buffer], { type: "audio/mpeg" })
+    );
 
-    // MP3ファイルとしてダウンロード
-    const mp3Blob = new Blob([mp3Data.buffer], { type: "audio/mp3" });
-    const mp3Url = URL.createObjectURL(mp3Blob);
     const mp3Link = document.createElement("a");
     mp3Link.href = mp3Url;
-    mp3Link.download = "generated_audio.mp3";
-    mp3Link.textContent = "Download Generated MP3";
+    mp3Link.download = "output.mp3";
+    mp3Link.style.display = "none";
     document.body.appendChild(mp3Link);
     mp3Link.click();
     document.body.removeChild(mp3Link);
+
+    output.textContent = "Processing complete!";
   } catch (error) {
-    console.error("MP3 generation error:", error);
+    output.textContent = "Error occurred during processing.";
+    console.error("FFmpeg error:", error);
   }
-}
+});
