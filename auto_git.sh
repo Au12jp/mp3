@@ -31,11 +31,11 @@ fi
 
 # リモートの変更をプルしてリベース
 echo "Pulling latest changes from origin..."
-git pull --rebase
+git pull --rebase origin main
 
 # コンフリクトが発生した場合
 if [ $? -ne 0 ]; then
-    echo "There was a conflict during rebase. Please resolve conflicts and continue."
+    echo "There was a conflict during rebase. Resetting to origin/main..."
     git reset --hard origin/main
     exit 1
 fi
