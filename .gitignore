@@ -1,0 +1,9 @@
+# node_modules フォルダを無視
+node_modules/
+
+# ログファイルを無視
+*.log
+
+# 一時的なファイルを無視
+*.tmp
+.DS_Store

@@ -1,0 +1,27 @@
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+}
+
+h1 {
+    text-align: center;
+}
+
+#fileInput {
+    display: block;
+    margin: 20px auto;
+}
+
+#convertButton {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+}
+
+#output {
+    margin-top: 20px;
+    white-space: pre-wrap;
+    border: 1px solid #000;
+    padding: 10px;
+}
