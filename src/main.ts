@@ -1,103 +1,123 @@
-import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
-const ffmpeg = createFFmpeg({
-  log: true,
-});
+// イベントリスナーを設定
+document
+  .getElementById("trimButton")
+  ?.addEventListener("click", handleVideoExport);
 
-const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-const convertButton = document.getElementById(
-  "convertButton"
-) as HTMLButtonElement;
-const output = document.getElementById("output") as HTMLElement;
+function formatTime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  return (
+    (hours < 10 ? "0" + hours : hours) +
+    ":" +
+    (minutes < 10 ? "0" + minutes : minutes) +
+    ":" +
+    (remainingSeconds < 10 ? "0" + remainingSeconds : remainingSeconds)
+  );
+}
 
-convertButton.addEventListener("click", async () => {
-  if (!fileInput.files?.length) {
-    alert("Please select an MP3 file.");
+async function handleVideoExport() {
+  const fileInput = document.getElementById(
+    "fileInput"
+  ) as HTMLInputElement | null;
+  if (!fileInput || !fileInput.files) {
+    alert("ファイルが選択されていません。");
+    return;
+  }
+
+  const startTime = (document.getElementById("startTime") as HTMLInputElement)
+    ?.value;
+  const endTime = (document.getElementById("endTime") as HTMLInputElement)
+    ?.value;
+
+  if (!startTime || !endTime) {
+    alert("開始時間と終了時間を入力してください。");
     return;
   }
 
   const file = fileInput.files[0];
-  output.textContent = "Processing...";
-
-  // FFmpegの準備ができているか確認
-  if (!ffmpeg.isLoaded()) {
-    await ffmpeg.load();
+  if (!file) {
+    alert("動画ファイルを選択してください。");
+    return;
   }
-
-  // MP3ファイルを書き込み
-  ffmpeg.FS("writeFile", "input.mp3", await fetchFile(file));
-
-  // FFmpegのログを解析するために標準エラー出力をキャプチャする
-  let ffmpegLog = "";
-  ffmpeg.setLogger(({ type, message }) => {
-    if (type === "fferr" || type === "ffout") {
-      console.log(`[${type}] ${message}`); // デバッグ用ログ出力
-      ffmpegLog += message + "\n";
-    }
-  });
 
   try {
-    // astatsフィルタを適用して、MP3ファイルを解析
-    await ffmpeg.run(
-      "-i",
-      "input.mp3",
-      "-filter_complex",
-      "[0:a]astats=metadata=1:reset=1",
-      "-f",
-      "null",
-      "-"
+    const trimmedVideoUrl = await trimVideo(
+      file,
+      formatTime(Number(startTime)),
+      formatTime(Number(endTime))
     );
+    const previewVideo = document.getElementById("preview") as HTMLVideoElement;
+    previewVideo.src = trimmedVideoUrl;
 
-    // ログデータ全体をデバッグ用に出力
-    console.log("Full FFmpeg log:", ffmpegLog);
-
-    // ログデータを解析して必要な情報を抽出
-    const logData = ffmpegLog.split("\n");
-    let dataOutput: string[] = [];
-
-    logData.forEach((line) => {
-      // 音量情報の取得
-      if (line.includes("Parsed_astats")) {
-        const timestampMatch = line.match(/t:(\d+\.\d+)/);
-        const meanVolumeMatch = line.match(/mean_volume:([-]?\d+\.\d+)/);
-        const peakVolumeMatch = line.match(/peak_volume:([-]?\d+\.\d+)/);
-
-        if (timestampMatch && meanVolumeMatch && peakVolumeMatch) {
-          const timestamp = parseFloat(timestampMatch[1]);
-          const meanVolume = parseFloat(meanVolumeMatch[1]);
-          const peakVolume = parseFloat(peakVolumeMatch[1]);
-
-          dataOutput.push(
-            `Time: ${timestamp}s, Mean Volume: ${meanVolume}dB, Peak Volume: ${peakVolume}dB`
-          );
-        }
-      }
-    });
-
-    // dataOutputが空かどうかを確認
-    if (dataOutput.length === 0) {
-      console.error("No data extracted from the FFmpeg log.");
-      output.textContent = "No volume data was extracted.";
-      return;
-    }
-
-    console.log("Data Output:", dataOutput); // 抽出されたデータの確認
-
-    // データをテキストファイルとして出力
-    const blob = new Blob([dataOutput.join("\n")], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "audio_analysis.txt";
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    output.textContent = "Processing complete!";
+    // 動画をダウンロードするリンクを生成
+    const downloadLink = document.createElement("a");
+    downloadLink.download = "trimmed_video.mp4";
+    downloadLink.href = trimmedVideoUrl;
+    downloadLink.click();
   } catch (error) {
-    output.textContent = "Error occurred during processing.";
-    console.error("FFmpeg error:", error);
+    console.error("エラーが発生しました: ", error);
   }
-});
+}
+
+async function trimVideo(
+  inputFile: File,
+  startTime: string,
+  endTime: string
+): Promise<string> {
+  const ffmpeg = new FFmpeg();
+  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
+
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL: await toBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ),
+  });
+
+  console.log("FFmpegロード完了");
+
+  await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
+  console.log("input.mp4書き込み完了");
+
+  const duration = calculateDuration(startTime, endTime);
+
+  await ffmpeg.exec([
+    "-i",
+    "input.mp4",
+    "-ss",
+    startTime,
+    "-t",
+    duration,
+    "output.mp4",
+  ]);
+  console.log("output.mp4書き込み完了");
+
+  const data = await ffmpeg.readFile("output.mp4");
+  console.log("output.mp4読み込み完了");
+
+  const videoBlob = new Blob([new Uint8Array(data as Uint8Array)], {
+    type: "video/mp4",
+  });
+  const url = URL.createObjectURL(videoBlob);
+
+  console.log("URL作成完了");
+
+  return url;
+}
+
+function calculateDuration(startTime: string, endTime: string): string {
+  const start = toSeconds(startTime);
+  const end = toSeconds(endTime);
+  return (end - start).toString();
+}
+
+function toSeconds(time: string): number {
+  const parts = time.split(":").map(Number);
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
+}
