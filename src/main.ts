@@ -2,10 +2,11 @@ import { fetchFile } from "@ffmpeg/util";
 import { WorkerCommand, WorkerMessage } from "./core-mt/worker";
 
 const worker = new Worker("./core-mt/worker.js");
+
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const trimButton = document.getElementById("trimButton") as HTMLButtonElement;
 const videoOutput = document.getElementById("videoOutput") as HTMLVideoElement;
-const progressBar = document.getElementById("progress") as HTMLDivElement; // For progress bar
+const progressBar = document.getElementById("progress") as HTMLDivElement;
 const timeRemainingDisplay = document.getElementById(
   "timeRemaining"
 ) as HTMLDivElement;
@@ -20,7 +21,6 @@ function sendWorkerCommand<T = any>(
       if (event.data.status === "error") {
         reject(event.data.message);
       } else if (event.data.status === "progress") {
-        // Handle progress
         const { percent, estimatedRemainingTime } = event.data;
         progressBar.style.width = `${percent}%`;
         timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;

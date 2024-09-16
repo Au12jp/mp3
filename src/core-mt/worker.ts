@@ -1,8 +1,5 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import {
-  FFMessageLoadConfig,
-  ProgressEventCallback,
-} from "@ffmpeg/ffmpeg/dist/esm/types";
+import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { toBlobURL } from "@ffmpeg/util";
 
 export type WorkerCommand = "load" | "writeFile" | "readFile" | "run";
@@ -123,14 +120,15 @@ async function handleRun(args: RunCommandArgs) {
   try {
     if (ffmpeg) {
       let startTime = performance.now();
-      ffmpeg.on("progress", ({ progress, time }) => {
-        const elapsedTime = (performance.now() - startTime) / 1000;
+      ffmpeg.on("progress", ({ progress }) => {
+        const elapsedTime = (performance.now() - startTime) / 1000; // in seconds
 
         const percent = progress * 100;
 
         const estimatedTotalTime = elapsedTime / progress;
         const estimatedRemainingTime = estimatedTotalTime - elapsedTime;
 
+        // Send progress information back to the main thread
         self.postMessage({
           status: "progress",
           percent: Math.round(percent),
@@ -139,8 +137,8 @@ async function handleRun(args: RunCommandArgs) {
         });
       });
 
-      await ffmpeg.exec(args.commandArgs);
-      self.postMessage({ status: "execution-completed" });
+      const result = await ffmpeg.exec(args.commandArgs);
+      self.postMessage({ status: "execution-completed", result });
     }
   } catch (error) {
     self.postMessage({
