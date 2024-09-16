@@ -2,7 +2,7 @@
 
 # ビルドプロセスを実行
 echo "Running build process..."
-npm run build  # または `yarn build`
+npm run build  # または `yarn build` を使用している場合は `yarn build`
 
 # ビルドに失敗した場合、スクリプトを終了
 if [ $? -ne 0 ]; then
@@ -10,24 +10,46 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# リモートの変更を取得し、ローカルに反映
-git pull origin main --rebase
+# ステージされていない変更を確認
+if ! git diff --quiet; then
+    echo "There are unstaged changes. Staging and committing them..."
 
-# 現在のコミット数を取得して、それに基づいたコミットメッセージを生成
-commit_count=$(git rev-list --count HEAD)
-commit_message="Auto commit #$commit_count"
+    # 現在のコミット数を取得して、それに基づいたコミットメッセージを生成
+    commit_count=$(git rev-list --count HEAD)
+    commit_message="Auto commit #$commit_count"
 
-# Gitの状態を確認し、変更があれば自動でコミット＆プッシュ
-git add .
-git commit -m "$commit_message"
+    # 変更をステージングエリアに追加
+    git add .
+
+    # 変更をコミット
+    git commit -m "$commit_message"
+fi
+
+# リモートの変更をプルしてリベース
+echo "Pulling latest changes from origin..."
+git pull --rebase
+
+# コンフリクトが発生した場合
+if [ $? -ne 0 ]; then
+    echo "There was a conflict during rebase. Please resolve conflicts and continue."
+    exit 1
+fi
+
+# リベースが完了したらプッシュ
+echo "Pushing to main..."
 git push origin main
 
-# GitHub Actionsでのデプロイを待つ
-echo "Deployment process will be handled by GitHub Actions..."
+# GitHub Pagesへのデプロイ
+echo "Deploying to GitHub Pages..."
+# gh-pagesブランチの最新デプロイだけを保持するために、リモートのgh-pagesブランチを上書き
+git push --force origin main:gh-pages
 
-# ローカルの不要なGitオブジェクトをクリーンアップ
+# ローカルおよびリモートの不要なGitオブジェクトをクリーンアップ
 echo "Cleaning up old deployments..."
 git reflog expire --expire=now --all
 git gc --prune=now --aggressive
+
+# リモートの不要なブランチや履歴をクリーンアップ
+git push origin --prune
 
 echo "Deployment completed and old deployments cleaned up."
