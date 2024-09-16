@@ -4,15 +4,13 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 const ffmpeg = new FFmpeg();
 
-const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
-
 // Async function to handle the loading of URLs
 async function loadFFmpeg() {
   const config: FFMessageLoadConfig = {
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"), // Await the Promise to get the string
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"), // Await the Promise
+    coreURL: await toBlobURL(`./core-mt/ffmpeg-core.js`, "text/javascript"), // Await the Promise to get the string
+    wasmURL: await toBlobURL(`./core-mt/ffmpeg-core.wasm`, "application/wasm"), // Await the Promise
     workerURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.worker.js`,
+      `./core-mt/ffmpeg-core.worker.js`,
       "text/javascript"
     ), // Await the Promise
   };
