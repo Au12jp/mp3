@@ -1,14 +1,24 @@
 import { fetchFile } from "@ffmpeg/util";
 
+type WorkerCommand = "load" | "writeFile" | "readFile" | "run";
+
+interface WorkerMessage {
+  command: WorkerCommand;
+  args: any[];
+}
+
 const worker = new Worker("./core-mt/worker.js");
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const trimButton = document.getElementById("trimButton") as HTMLButtonElement;
 const videoOutput = document.getElementById("videoOutput") as HTMLVideoElement;
 
-function sendWorkerCommand(command: string, args: any[] = []): Promise<any> {
+function sendWorkerCommand<T = any>(
+  command: WorkerCommand,
+  args: any[] = []
+): Promise<T> {
   return new Promise((resolve, reject) => {
-    worker.postMessage({ command, args });
+    worker.postMessage({ command, args } as WorkerMessage);
     worker.onmessage = (event) => {
       if (event.data.status === "error") {
         reject(event.data.message);
@@ -44,10 +54,12 @@ async function trimVideo(file: File, startTime: string, endTime: string) {
     "output.mp4",
   ];
 
-  await sendWorkerCommand("writeFile", ["input.mp4", inputFileData]);
-  await sendWorkerCommand("run", args);
+  await sendWorkerCommand<void>("writeFile", ["input.mp4", inputFileData]);
+  await sendWorkerCommand<void>("run", [args]);
 
-  const output = await sendWorkerCommand("readFile", ["output.mp4"]);
+  const output = await sendWorkerCommand<Uint8Array>("readFile", [
+    "output.mp4",
+  ]);
   const videoBlob = new Blob([new Uint8Array(output)], { type: "video/mp4" });
 
   return URL.createObjectURL(videoBlob);
