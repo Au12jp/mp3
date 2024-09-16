@@ -2,13 +2,16 @@
 
 # ビルドプロセスを実行
 echo "Running build process..."
-npm run build  # または `yarn build` を使用している場合は `yarn build`
+npm run build  # または `yarn build`
 
 # ビルドに失敗した場合、スクリプトを終了
 if [ $? -ne 0 ]; then
     echo "Build failed. Aborting commit and push."
     exit 1
 fi
+
+# リモートの変更を取得し、ローカルに反映
+git pull origin main --rebase
 
 # 現在のコミット数を取得して、それに基づいたコミットメッセージを生成
 commit_count=$(git rev-list --count HEAD)
