@@ -119,6 +119,23 @@ async function handleReadFile(args: ReadFileArgs) {
 async function handleRun(args: RunCommandArgs) {
   try {
     if (ffmpeg) {
+      let startTime = performance.now();
+      ffmpeg.on("progress", ({ progress, time }) => {
+        const elapsedTime = (performance.now() - startTime) / 1000;
+
+        const percent = progress * 100;
+
+        const estimatedTotalTime = elapsedTime / progress;
+        const estimatedRemainingTime = estimatedTotalTime - elapsedTime;
+
+        self.postMessage({
+          status: "progress",
+          percent: Math.round(percent),
+          elapsedTime: Math.round(elapsedTime),
+          estimatedRemainingTime: Math.round(estimatedRemainingTime),
+        });
+      });
+
       await ffmpeg.exec(args.commandArgs);
       self.postMessage({ status: "execution-completed" });
     }
