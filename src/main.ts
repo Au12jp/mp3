@@ -92,6 +92,7 @@ convertButton.addEventListener("click", async () => {
     if (bestFrame) {
       // 最も変動の大きいフレームを表示
       const bestImg = document.createElement("img");
+      console.log(bestFrame);
       bestImg.src = bestFrame;
       bestImg.style.width = "100%";
       bestImg.style.height = "auto";
