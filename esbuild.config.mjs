@@ -1,23 +1,38 @@
 import esbuild from "esbuild";
-import { readdirSync } from "fs";
+import { readdirSync, statSync } from "fs";
 import { join } from "path";
+
+function getAllTsFiles(dir) {
+  let results = [];
+  const files = readdirSync(dir);
+
+  files.forEach((file) => {
+    const fullPath = join(dir, file);
+    const stats = statSync(fullPath);
+
+    if (stats.isDirectory()) {
+      results = results.concat(getAllTsFiles(fullPath));
+    } else if (stats.isFile() && file.endsWith(".ts")) {
+      results.push(fullPath);
+    }
+  });
+
+  return results;
+}
 
 const isWatchMode = process.argv.includes("--watch");
 
-// TypeScriptファイルを全て取得
-const tsFiles = readdirSync("src")
-  .filter((file) => file.endsWith(".ts"))
-  .map((file) => join("src", file));
+const tsFiles = getAllTsFiles("src");
 
 const buildOptions = {
   entryPoints: tsFiles,
   bundle: true,
-  minify: true, // ブラウザ向けにビルド時にコードを縮小
-  outdir: "src", // 出力先ディレクトリをdistに変更
-  platform: "browser", // ブラウザ向けに変更
-  format: "iife", // 即時実行形式に変更
-  target: ["es2015"], // ES2015以降をターゲットに
-  sourcemap: true, // ソースマップを生成
+  minify: true,
+  outdir: "src",
+  platform: "browser",
+  format: "iife",
+  target: ["es2015"],
+  sourcemap: true,
 };
 
 async function build() {

@@ -2,6 +2,8 @@
   "files.exclude": {
     "**/node_modules": true,
     "**/main.js": true,
-    "**/main.js.map": true
+    "**/main.js.map": true,
+    "**/worker.js": true,
+    "**/worker.js.map": true
   }
 }

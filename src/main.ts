@@ -7,6 +7,7 @@ const ffmpeg = new FFmpeg();
 // Async function to handle the loading of URLs
 async function loadFFmpeg() {
   const config: FFMessageLoadConfig = {
+    classWorkerURL: await toBlobURL(`./core-mt/worker.js`, "text/javascript"),
     coreURL: await toBlobURL(`./core-mt/ffmpeg-core.js`, "text/javascript"), // Await the Promise to get the string
     wasmURL: await toBlobURL(`./core-mt/ffmpeg-core.wasm`, "application/wasm"), // Await the Promise
     workerURL: await toBlobURL(

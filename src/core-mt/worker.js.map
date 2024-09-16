@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["worker.ts"],
+  "sourcesContent": ["console.warn(\"start\");\n"],
+  "mappings": "mBAAA,QAAQ,KAAK,OAAO",
+  "names": []
+}
