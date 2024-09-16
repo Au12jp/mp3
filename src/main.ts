@@ -1,7 +1,5 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
-console.log(2);
-
 const ffmpeg = createFFmpeg({
   log: true, // ログを有効化
 });
@@ -29,7 +27,7 @@ convertButton.addEventListener("click", async () => {
   }
 
   const file = fileInput.files[0]; // 最初のファイルを取得
-  output.textContent = "変換中...";
+  output.textContent = "FFT解析中...";
 
   // ffmpegのロード
   if (!ffmpeg.isLoaded()) {
@@ -39,21 +37,13 @@ convertButton.addEventListener("click", async () => {
   // MP3ファイルを書き込み
   ffmpeg.FS("writeFile", "input.mp3", await fetchFile(file));
 
-  // FFmpegのログを解析するために標準エラー出力をキャプチャする
-  let ffmpegLog = "";
-  ffmpeg.setLogger(({ type, message }) => {
-    if (type === "fferr" || type === "ffout") {
-      ffmpegLog += message + "\n";
-    }
-  });
-
   try {
     // FFTフィルタを使用して周波数解析を行い、結果を保存
     await ffmpeg.run(
       "-i",
       "input.mp3",
       "-filter_complex",
-      "astats=metadata=1:reset=1",
+      "afftfilt",
       "-f",
       "null",
       "-"
@@ -73,8 +63,7 @@ convertButton.addEventListener("click", async () => {
     link.textContent = "FFT結果をダウンロード";
     output.appendChild(link);
   } catch (error) {
-    output.textContent = "変換中にエラーが発生しました。";
+    output.textContent = "FFT解析中にエラーが発生しました。";
     console.error("FFmpeg error:", error);
-    console.error("FFmpeg log:", ffmpegLog);
   }
 });
