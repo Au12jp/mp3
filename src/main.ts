@@ -1,5 +1,7 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
+console.log(2);
+
 const ffmpeg = createFFmpeg({
   log: true, // ログを有効化
 });
@@ -35,7 +37,7 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // 音声統計情報（周波数含む）をテキスト出力
+    // 周波数解析フィルタ（astats）を使用して統計情報を取得
     await ffmpeg.run(
       "-i",
       "input.mp3",
@@ -46,19 +48,19 @@ convertButton.addEventListener("click", async () => {
       "-"
     );
 
-    // FFmpegのログ情報をテキストとして表示
+    // ログ情報をテキストとして出力
     const textBlob = new Blob([ffmpegLog], { type: "text/plain" });
     const textURL = URL.createObjectURL(textBlob);
 
-    // 結果をテキストとして表示
-    const textElement = document.createElement("a");
-    textElement.href = textURL;
-    textElement.download = "frequency_analysis.txt";
-    textElement.textContent = "Download Frequency Analysis";
-    output.textContent = "";
-    output.appendChild(textElement);
+    // ダウンロードリンクを生成
+    const link = document.createElement("a");
+    link.href = textURL;
+    link.download = "frequency_analysis.txt";
+    link.textContent = "Download Frequency Analysis";
+    output.innerHTML = ""; // 一度クリア
+    output.appendChild(link);
 
-    output.textContent += "\nConversion complete!";
+    output.innerHTML += "\nConversion complete!";
   } catch (error) {
     output.textContent = "Error occurred during conversion.";
     console.error("FFmpeg error:", error);
