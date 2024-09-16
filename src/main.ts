@@ -56,22 +56,28 @@ async function trimVideo(file: File, startTime: string, endTime: string) {
     "output.mp4",
   ];
 
+  console.log("Writing file to FFmpeg...");
   await sendWorkerCommand<void>("writeFile", ["input.mp4", inputFileData]);
+
+  console.log("Running FFmpeg...");
   await sendWorkerCommand<void>("run", args);
 
+  console.log("Reading output file from FFmpeg...");
   const output = await sendWorkerCommand<Uint8Array>("readFile", [
     "output.mp4",
   ]);
+
   const videoBlob = new Blob([new Uint8Array(output)], { type: "video/mp4" });
 
   return URL.createObjectURL(videoBlob);
 }
-
 trimButton.addEventListener("click", async () => {
   if (!fileInput.files || fileInput.files.length === 0) {
     alert("Please select a video file.");
     return;
   }
+
+  console.log("Starting trimming process...");
 
   const start = (document.getElementById("start") as HTMLInputElement).value;
   const end = (document.getElementById("end") as HTMLInputElement).value;

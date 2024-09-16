@@ -120,15 +120,20 @@ async function handleRun(args: RunCommandArgs) {
   try {
     if (ffmpeg) {
       let startTime = performance.now();
-      ffmpeg.on("progress", ({ progress }) => {
-        const elapsedTime = (performance.now() - startTime) / 1000; // in seconds
 
+      console.log("Running FFmpeg with arguments:", args.commandArgs);
+      ffmpeg.on("progress", ({ progress, time }) => {
+        const elapsedTime = (performance.now() - startTime) / 1000;
         const percent = progress * 100;
-
         const estimatedTotalTime = elapsedTime / progress;
         const estimatedRemainingTime = estimatedTotalTime - elapsedTime;
 
-        // Send progress information back to the main thread
+        console.log(
+          `Progress: ${Math.round(percent)}%, Time Left: ${Math.round(
+            estimatedRemainingTime
+          )}s`
+        );
+
         self.postMessage({
           status: "progress",
           percent: Math.round(percent),
@@ -138,9 +143,11 @@ async function handleRun(args: RunCommandArgs) {
       });
 
       const result = await ffmpeg.exec(args.commandArgs);
+      console.log("FFmpeg execution completed");
       self.postMessage({ status: "execution-completed", result });
     }
   } catch (error) {
+    console.error("Error during FFmpeg execution:", error);
     self.postMessage({
       status: "error",
       message: error instanceof Error ? error.message : String(error),
