@@ -41,6 +41,8 @@ convertButton.addEventListener("click", async () => {
       "input.mp3",
       "-filter_complex",
       "showfreqs=s=1280x720:mode=line",
+      "-frames:v",
+      "1", // これを追加して最初のフレームだけを出力
       "output.png"
     );
 
