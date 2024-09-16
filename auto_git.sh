@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# 環境変数の設定
+REPO="Au12jp/mp3"  # リポジトリの名前
+ENVIRONMENT="github-pages"  # GitHub Pages用の環境名
+
 # ビルドプロセスを実行
 echo "Running build process..."
 npm run build  # または `yarn build` を使用している場合は `yarn build`
@@ -32,6 +36,7 @@ git pull --rebase
 # コンフリクトが発生した場合
 if [ $? -ne 0 ]; then
     echo "There was a conflict during rebase. Please resolve conflicts and continue."
+    git reset --hard origin/main
     exit 1
 fi
 
