@@ -29,8 +29,10 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Delete old GitHub Pages deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHubトークンを使用
         run: |
-          gh api repos/{owner}/{repo}/pages/deployment --method DELETE
+          gh api repos/${{ github.repository }}/pages/deployment --method DELETE
           echo "Old deployments deleted"
 
       - name: Upload artifact
