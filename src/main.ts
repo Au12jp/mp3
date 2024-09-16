@@ -1,17 +1,14 @@
 import { fetchFile } from "@ffmpeg/util";
-
-type WorkerCommand = "load" | "writeFile" | "readFile" | "run";
-
-interface WorkerMessage {
-  command: WorkerCommand;
-  args: any[];
-}
+import { WorkerCommand, WorkerMessage } from "./core-mt/worker";
 
 const worker = new Worker("./core-mt/worker.js");
-
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const trimButton = document.getElementById("trimButton") as HTMLButtonElement;
 const videoOutput = document.getElementById("videoOutput") as HTMLVideoElement;
+const progressBar = document.getElementById("progress") as HTMLDivElement; // For progress bar
+const timeRemainingDisplay = document.getElementById(
+  "timeRemaining"
+) as HTMLDivElement;
 
 function sendWorkerCommand<T = any>(
   command: WorkerCommand,
@@ -22,6 +19,11 @@ function sendWorkerCommand<T = any>(
     worker.onmessage = (event) => {
       if (event.data.status === "error") {
         reject(event.data.message);
+      } else if (event.data.status === "progress") {
+        // Handle progress
+        const { percent, estimatedRemainingTime } = event.data;
+        progressBar.style.width = `${percent}%`;
+        timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;
       } else {
         resolve(event.data.result);
       }
@@ -55,7 +57,7 @@ async function trimVideo(file: File, startTime: string, endTime: string) {
   ];
 
   await sendWorkerCommand<void>("writeFile", ["input.mp4", inputFileData]);
-  await sendWorkerCommand<void>("run", [args]);
+  await sendWorkerCommand<void>("run", args);
 
   const output = await sendWorkerCommand<Uint8Array>("readFile", [
     "output.mp4",

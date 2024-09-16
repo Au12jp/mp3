@@ -1,28 +1,31 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
+import {
+  FFMessageLoadConfig,
+  ProgressEventCallback,
+} from "@ffmpeg/ffmpeg/dist/esm/types";
 import { toBlobURL } from "@ffmpeg/util";
 
-type WorkerCommand = "load" | "writeFile" | "readFile" | "run";
+export type WorkerCommand = "load" | "writeFile" | "readFile" | "run";
 
-interface WorkerMessage {
+export interface WorkerMessage {
   command: WorkerCommand;
   args: any[];
 }
 
-interface WriteFileArgs {
+export interface WriteFileArgs {
   fileName: string;
   fileData: Uint8Array;
 }
 
-interface ReadFileArgs {
+export interface ReadFileArgs {
   fileName: string;
 }
 
-interface RunCommandArgs {
+export interface RunCommandArgs {
   commandArgs: string[];
 }
 
-let ffmpeg: FFmpeg | null = null;
+export let ffmpeg: FFmpeg | null = null;
 
 self.addEventListener("message", async (event: MessageEvent<WorkerMessage>) => {
   const { command, args } = event.data;

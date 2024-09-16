@@ -9,13 +9,27 @@
   </head>
   <body>
     <div class="container">
-      <h1>動画トリミングツール</h1>
-      <input type="file" id="fileInput" accept="video/*" />
-      <label for="start">開始時間 (秒):</label>
-      <input type="number" id="start" min="0" placeholder="例: 10" />
-      <label for="end">終了時間 (秒):</label>
-      <input type="number" id="end" min="0" placeholder="例: 20" />
-      <button id="trimButton">動画をトリミング</button>
+      <h1>Video Trimming with FFmpeg</h1>
+
+      <div class="input-container">
+        <label for="fileInput">Select a Video File:</label>
+        <input type="file" id="fileInput" accept="video/*" />
+      </div>
+
+      <div class="time-inputs">
+        <label for="start">Start Time (in seconds):</label>
+        <input type="number" id="start" placeholder="0" />
+        <label for="end">End Time (in seconds):</label>
+        <input type="number" id="end" placeholder="10" />
+      </div>
+
+      <button id="trimButton">Trim Video</button>
+
+      <div id="progressContainer">
+        <div id="progress"></div>
+      </div>
+      <div id="timeRemaining">Estimated Time Left: 0s</div>
+
       <video id="videoOutput" controls></video>
     </div>
     <script type="module" src="main.js"></script>
