@@ -11,10 +11,22 @@ self.addEventListener("message", async (event: MessageEvent) => {
     case "load":
       await loadFFmpeg();
       break;
+    case "writeFile":
+      if (ffmpeg) {
+        await ffmpeg.writeFile(args[0], args[1]);
+        self.postMessage({ status: "file-written" });
+      }
+      break;
+    case "readFile":
+      if (ffmpeg) {
+        const data = await ffmpeg.readFile(args[0]);
+        self.postMessage({ result: data });
+      }
+      break;
     case "run":
-      if (ffmpeg && Array.isArray(args)) {
-        const result = await ffmpeg.exec(args);
-        self.postMessage({ result });
+      if (ffmpeg) {
+        await ffmpeg.exec(args);
+        self.postMessage({ status: "execution-completed" });
       }
       break;
     default:
