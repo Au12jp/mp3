@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["main.ts"],
-  "sourcesContent": ["console.log(\"start\");\n"],
-  "mappings": "mBAAA,QAAQ,IAAI,OAAO",
-  "names": []
+  "sourcesContent": ["// main.ts\nconst worker = new Worker(\"./core-mt/worker.js\");\n\n// HTML elements\nconst fileInput = document.getElementById(\"fileInput\") as HTMLInputElement;\nconst trimButton = document.getElementById(\"trimButton\") as HTMLButtonElement;\nconst videoOutput = document.getElementById(\"videoOutput\") as HTMLVideoElement;\n\n// Add event listener for button click\ntrimButton.addEventListener(\"click\", () => {\n  if (!fileInput.files || fileInput.files.length === 0) {\n    alert(\"Please select a video file first.\");\n    return;\n  }\n\n  const start = (document.getElementById(\"start\") as HTMLInputElement).value;\n  const end = (document.getElementById(\"end\") as HTMLInputElement).value;\n  const file = fileInput.files[0];\n\n  // Send the data to the worker for processing\n  worker.postMessage({\n    command: \"trim\",\n    file: file,\n    startTime: start,\n    endTime: end,\n  });\n});\n\n// Handle messages from the worker\nworker.onmessage = (event) => {\n  const { trimmedVideoUrl } = event.data;\n  videoOutput.src = trimmedVideoUrl; // Set the trimmed video for preview\n};\n"],
+  "mappings": "mBACA,IAAMA,EAAS,IAAI,OAAO,qBAAqB,EAGzCC,EAAY,SAAS,eAAe,WAAW,EAC/CC,EAAa,SAAS,eAAe,YAAY,EACjDC,EAAc,SAAS,eAAe,aAAa,EAGzDD,EAAW,iBAAiB,QAAS,IAAM,CACzC,GAAI,CAACD,EAAU,OAASA,EAAU,MAAM,SAAW,EAAG,CACpD,MAAM,mCAAmC,EACzC,MACF,CAEA,IAAMG,EAAS,SAAS,eAAe,OAAO,EAAuB,MAC/DC,EAAO,SAAS,eAAe,KAAK,EAAuB,MAC3DC,EAAOL,EAAU,MAAM,CAAC,EAG9BD,EAAO,YAAY,CACjB,QAAS,OACT,KAAMM,EACN,UAAWF,EACX,QAASC,CACX,CAAC,CACH,CAAC,EAGDL,EAAO,UAAaO,GAAU,CAC5B,GAAM,CAAE,gBAAAC,CAAgB,EAAID,EAAM,KAClCJ,EAAY,IAAMK,CACpB",
+  "names": ["worker", "fileInput", "trimButton", "videoOutput", "start", "end", "file", "event", "trimmedVideoUrl"]
 }

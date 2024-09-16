@@ -1,64 +1,40 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
-const ffmpeg = new FFmpeg();
+self.addEventListener("message", async (event: MessageEvent) => {
+  const { command, file, startTime, endTime } = event.data;
 
-// Async function to handle the loading of URLs
-async function loadFFmpeg() {
-  const config: FFMessageLoadConfig = {
-    classWorkerURL: await toBlobURL(`./core-mt/worker.js`, "text/javascript"),
-    coreURL: await toBlobURL(`./core-mt/ffmpeg-core.js`, "text/javascript"), // Await the Promise to get the string
-    wasmURL: await toBlobURL(`./core-mt/ffmpeg-core.wasm`, "application/wasm"), // Await the Promise
-    workerURL: await toBlobURL(
-      `./core-mt/ffmpeg-core.worker.js`,
-      "text/javascript"
-    ), // Await the Promise
-  };
-
-  console.warn(config);
-
-  // Load ffmpeg with the resolved config
-  await ffmpeg.load(config);
-}
-
-// Call the async function
-loadFFmpeg().catch(console.error);
-
-// HTML要素を取得
-const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-const trimButton = document.getElementById("trimButton") as HTMLButtonElement;
-const videoOutput = document.getElementById("videoOutput") as HTMLVideoElement;
-
-trimButton.addEventListener("click", async () => {
-  if (!fileInput.files || fileInput.files.length === 0) {
-    alert("まず動画ファイルを選択してください。");
-    return;
-  }
-
-  const start = (document.getElementById("start") as HTMLInputElement).value;
-  const end = (document.getElementById("end") as HTMLInputElement).value;
-
-  // トリミング処理を実行
-  const trimmedVideoUrl = await trimVideo(fileInput.files[0], start, end);
-  if (trimmedVideoUrl) {
-    videoOutput.src = trimmedVideoUrl; // トリミングされた動画をプレビュー
+  if (command === "trim") {
+    const trimmedVideoUrl = await trimVideo(file, startTime, endTime);
+    self.postMessage({ trimmedVideoUrl });
   }
 });
 
+// Function to trim the video
 async function trimVideo(
   file: File,
   startTime: string,
   endTime: string
 ): Promise<string | null> {
-  console.warn("ffmpeg loaded");
+  const ffmpeg = new FFmpeg();
+  const baseURL = "./core-mt"; // Point to your local FFmpeg files
 
-  // 入力ファイルをFFmpegの仮想ファイルシステムに書き込み
+  // FFmpeg loading and worker setup
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL: await toBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ),
+  });
+
+  // Write the input file to FFmpeg's filesystem
   await ffmpeg.writeFile("input.mp4", await fetchFile(file));
 
   const duration = (parseInt(endTime) - parseInt(startTime)).toString();
 
-  // FFmpegを使って動画をトリミング
+  // Execute the FFmpeg trim command
   await ffmpeg.exec([
     "-i",
     "input.mp4",
@@ -69,12 +45,12 @@ async function trimVideo(
     "output.mp4",
   ]);
 
-  // トリミング後のファイルを読み込み
+  // Read the output file and create a Blob URL for it
   const data = await ffmpeg.readFile("output.mp4");
   const videoBlob = new Blob([new Uint8Array(data as Uint8Array)], {
     type: "video/mp4",
   });
 
-  // トリミングされた動画のURLを作成
+  // Return the Blob URL
   return URL.createObjectURL(videoBlob);
 }

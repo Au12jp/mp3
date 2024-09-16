@@ -1,2 +1,2 @@
-"use strict";(()=>{console.log("start");})();
+"use strict";(()=>{var s=new Worker("./core-mt/worker.js"),n=document.getElementById("fileInput"),l=document.getElementById("trimButton"),m=document.getElementById("videoOutput");l.addEventListener("click",()=>{if(!n.files||n.files.length===0){alert("Please select a video file first.");return}let e=document.getElementById("start").value,t=document.getElementById("end").value,o=n.files[0];s.postMessage({command:"trim",file:o,startTime:e,endTime:t})});s.onmessage=e=>{let{trimmedVideoUrl:t}=e.data;m.src=t};})();
 //# sourceMappingURL=main.js.map
