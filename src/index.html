@@ -1,24 +1,23 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>動画トリミング</title>
+    <title>Video Trimmer</title>
     <link rel="stylesheet" href="style.css" />
+    <script src="coi-serviceworker.js"></script>
   </head>
   <body>
-    <h1>動画トリミング</h1>
-    <input type="file" id="fileInput" accept="video/mp4" />
-    <br />
-    <label for="startTime">開始時間 (秒): </label>
-    <input type="number" id="startTime" placeholder="開始時間" />
-    <br />
-    <label for="endTime">終了時間 (秒): </label>
-    <input type="number" id="endTime" placeholder="終了時間" />
-    <br />
-    <button id="trimButton">動画をトリミング</button>
-    <br />
-    <video id="preview" controls></video>
-    <script type="module" src="main.ts"></script>
+    <div class="container">
+      <h1>動画トリミングツール</h1>
+      <input type="file" id="fileInput" accept="video/*" />
+      <label for="start">開始時間 (秒):</label>
+      <input type="number" id="start" min="0" placeholder="例: 10" />
+      <label for="end">終了時間 (秒):</label>
+      <input type="number" id="end" min="0" placeholder="例: 20" />
+      <button id="trimButton">動画をトリミング</button>
+      <video id="videoOutput" controls></video>
+    </div>
+    <script type="module" src="main.js"></script>
   </body>
 </html>

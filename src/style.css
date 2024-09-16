@@ -1,25 +1,49 @@
-body {
-  font-family: Arial, sans-serif;
-  margin: 20px;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-input {
-  margin-bottom: 10px;
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f4f4f4;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+input[type="file"],
+input[type="number"],
+button {
+  display: block;
+  margin: 10px auto;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px solid #ddd;
 }
 
 button {
-  padding: 10px 20px;
-  background-color: #4caf50;
+  background-color: #007bff;
   color: white;
-  border: none;
   cursor: pointer;
 }
 
 button:hover {
-  background-color: #45a049;
+  background-color: #0056b3;
 }
 
 video {
+  width: 100%;
+  max-width: 500px;
   margin-top: 20px;
-  max-width: 100%;
 }
