@@ -1,6 +1,6 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
-console.log(1);
+console.log(2);
 
 const ffmpeg = createFFmpeg({
   log: true, // ログを有効化
@@ -37,14 +37,13 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // MP3の周波数解析。showfreqsフィルタで周波数スペクトラムを画像として出力
     await ffmpeg.run(
       "-i",
       "input.mp3",
       "-filter_complex",
-      "showfreqs=s=1280x720:mode=line",
+      "showfreqs=s=1280x720:mode=bar",
       "-frames:v",
-      "1", // これを追加して最初のフレームだけを出力
+      "1",
       "output.png"
     );
 
