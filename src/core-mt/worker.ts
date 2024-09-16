@@ -54,7 +54,7 @@ async function loadFFmpeg() {
   try {
     if (ffmpeg === null) {
       ffmpeg = new FFmpeg();
-      const baseURL = "./core-mt";
+      const baseURL = ".";
 
       const config: FFMessageLoadConfig = {
         classWorkerURL: await toBlobURL(
