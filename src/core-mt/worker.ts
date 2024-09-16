@@ -57,6 +57,10 @@ async function loadFFmpeg() {
       const baseURL = "./core-mt";
 
       const config: FFMessageLoadConfig = {
+        classWorkerURL: await toBlobURL(
+          `${baseURL}/worker.js`,
+          "text/javascript"
+        ),
         coreURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.js`,
           "text/javascript"
