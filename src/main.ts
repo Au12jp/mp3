@@ -55,8 +55,12 @@ convertButton.addEventListener("click", async () => {
 
     // 結果を画像として表示
     const img = document.createElement("img");
+    console.log(imgURL); // URLを確認
     img.src = imgURL;
+    img.style.width = "100%"; // 必要に応じてサイズを調整
+    img.style.height = "auto";
     output.appendChild(img);
+    console.log("Image element added to the page");
 
     // ダウンロードリンクを生成
     const link = document.createElement("a");
