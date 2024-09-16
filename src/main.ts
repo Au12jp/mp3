@@ -37,18 +37,18 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // 周波数解析フィルタ（astats）を使用して統計情報を取得
+    // astatsフィルタを使って、周波数解析の結果を出力
     await ffmpeg.run(
       "-i",
       "input.mp3",
-      "-filter_complex",
+      "-af",
       "astats=metadata=1:reset=1",
       "-f",
       "null",
       "-"
     );
 
-    // ログ情報をテキストとして出力
+    // ログ情報をテキストファイルとして保存する
     const textBlob = new Blob([ffmpegLog], { type: "text/plain" });
     const textURL = URL.createObjectURL(textBlob);
 
