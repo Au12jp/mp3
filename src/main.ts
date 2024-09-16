@@ -35,12 +35,12 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // astatsフィルタを使い、全フレームの情報を出力
+    // astatsで音量情報を取得し、showspectrumで周波数を解析
     await ffmpeg.run(
       "-i",
       "input.mp3",
-      "-af",
-      "astats=metadata=1:reset=1", // 各フレームごとの音声情報を取得
+      "-filter_complex",
+      "[0:a]astats=metadata=1:reset=1,showspectrum=s=320x720:mode=combined",
       "-f",
       "null",
       "-"
@@ -51,11 +51,11 @@ convertButton.addEventListener("click", async () => {
     let dataOutput: string[] = [];
 
     logData.forEach((line) => {
+      // 音量情報の取得
       if (line.includes("Parsed_astats")) {
         const timestampMatch = line.match(/t:(\d+\.\d+)/); // タイムスタンプを取得
         const meanVolumeMatch = line.match(/mean_volume:([-]?\d+\.\d+)/); // 平均音量を取得
         const peakVolumeMatch = line.match(/peak_volume:([-]?\d+\.\d+)/); // ピーク音量を取得
-        const frequencyMatch = line.match(/freq:[\d\s]+/); // 周波数情報を取得（必要に応じて）
 
         if (timestampMatch && meanVolumeMatch && peakVolumeMatch) {
           const timestamp = parseFloat(timestampMatch[1]);
@@ -63,8 +63,17 @@ convertButton.addEventListener("click", async () => {
           const peakVolume = parseFloat(peakVolumeMatch[1]);
 
           dataOutput.push(
-            `Time: ${timestamp}s, Mean Volume: ${meanVolume}dB, Peak Volume: ${peakVolume}dB\n`
+            `Time: ${timestamp}s, Mean Volume: ${meanVolume}dB, Peak Volume: ${peakVolume}dB`
           );
+        }
+      }
+
+      // 周波数情報の取得
+      if (line.includes("showspectrum")) {
+        const spectrumMatch = line.match(/freq=(\d+)/); // 仮の周波数を取得
+        if (spectrumMatch) {
+          const frequency = parseFloat(spectrumMatch[1]);
+          dataOutput.push(` Frequency: ${frequency}Hz\n`);
         }
       }
     });
@@ -72,16 +81,65 @@ convertButton.addEventListener("click", async () => {
     // 解析結果をテキストファイルとして出力
     const blob = new Blob([dataOutput.join("")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
+
+    // ダウンロードリンクを生成
     const link = document.createElement("a");
     link.href = url;
-    console.warn(url);
-    link.download = "audio_analysis.txt";
-    link.textContent = "Download Analysis Results";
-    output.appendChild(link);
+    link.download = "audio_analysis.txt"; // ダウンロードファイル名
+    link.style.display = "none"; // リンクを非表示にする
+    document.body.appendChild(link); // ダウンロードリンクをページに追加
+    link.click(); // ダウンロードを自動的にトリガー
+    document.body.removeChild(link); // ダウンロード後にリンクを削除
 
     output.textContent = "Conversion complete!";
+
+    // Step 2: テキストファイルからMP3生成
+    // 生成された音量・周波数データを使って新しいMP3を作成
+    await generateMP3(dataOutput);
   } catch (error) {
     output.textContent = "Error occurred during conversion.";
     console.error("FFmpeg error:", error);
   }
 });
+
+// MP3生成のための関数
+async function generateMP3(dataOutput: string[]) {
+  // MP3生成用のFFmpegコマンドを実行
+  let audioData = "";
+
+  dataOutput.forEach((line) => {
+    const matches = line.match(/Frequency: (\d+)Hz/);
+    if (matches) {
+      const frequency = matches[1];
+      // ここで、周波数に応じたサウンドデータを生成（仮の処理）
+      audioData += `sine=${frequency}\n`;
+    }
+  });
+
+  try {
+    // 仮のサウンドデータで新しいMP3を生成
+    await ffmpeg.run(
+      "-f",
+      "lavfi",
+      "-i",
+      `sine=frequency=1000:duration=10`, // 例として、1000Hzの音を10秒間生成
+      "output.mp3"
+    );
+
+    // 生成されたMP3を読み込み
+    const mp3Data = ffmpeg.FS("readFile", "output.mp3");
+
+    // MP3ファイルとしてダウンロード
+    const mp3Blob = new Blob([mp3Data.buffer], { type: "audio/mp3" });
+    const mp3Url = URL.createObjectURL(mp3Blob);
+    const mp3Link = document.createElement("a");
+    mp3Link.href = mp3Url;
+    mp3Link.download = "generated_audio.mp3";
+    mp3Link.textContent = "Download Generated MP3";
+    document.body.appendChild(mp3Link);
+    mp3Link.click();
+    document.body.removeChild(mp3Link);
+  } catch (error) {
+    console.error("MP3 generation error:", error);
+  }
+}
