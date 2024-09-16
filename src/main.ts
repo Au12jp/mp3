@@ -1,7 +1,7 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
 const ffmpeg = createFFmpeg({
-  log: true, // ログを有効化
+  log: true,
 });
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
@@ -37,16 +37,19 @@ convertButton.addEventListener("click", async () => {
   });
 
   try {
-    // astatsとshowspectrumフィルタを適用して、MP3ファイルを解析
+    // astatsフィルタを適用して、MP3ファイルを解析
     await ffmpeg.run(
       "-i",
       "input.mp3",
       "-filter_complex",
-      "[0:a]astats=metadata=1:reset=1,showspectrum=s=320x720:mode=combined",
+      "[0:a]astats=metadata=1:reset=1",
       "-f",
       "null",
       "-"
     );
+
+    // ログデータ全体をデバッグ用に出力
+    console.log("Full FFmpeg log:", ffmpegLog);
 
     // ログデータを解析して必要な情報を抽出
     const logData = ffmpegLog.split("\n");
@@ -55,7 +58,6 @@ convertButton.addEventListener("click", async () => {
     logData.forEach((line) => {
       // 音量情報の取得
       if (line.includes("Parsed_astats")) {
-        console.log("Processing astats line:", line); // 確認用出力
         const timestampMatch = line.match(/t:(\d+\.\d+)/);
         const meanVolumeMatch = line.match(/mean_volume:([-]?\d+\.\d+)/);
         const peakVolumeMatch = line.match(/peak_volume:([-]?\d+\.\d+)/);
@@ -70,24 +72,21 @@ convertButton.addEventListener("click", async () => {
           );
         }
       }
-
-      // 周波数情報の取得
-      if (line.includes("showspectrum")) {
-        const spectrumMatch = line.match(/freq=(\d+)/); // 仮の周波数情報
-        if (spectrumMatch) {
-          const frequency = parseFloat(spectrumMatch[1]);
-          dataOutput.push(` Frequency: ${frequency}Hz\n`);
-        }
-      }
     });
+
+    // dataOutputが空かどうかを確認
+    if (dataOutput.length === 0) {
+      console.error("No data extracted from the FFmpeg log.");
+      output.textContent = "No volume data was extracted.";
+      return;
+    }
 
     console.log("Data Output:", dataOutput); // 抽出されたデータの確認
 
     // データをテキストファイルとして出力
-    const blob = new Blob([dataOutput.join("")], { type: "text/plain" });
+    const blob = new Blob([dataOutput.join("\n")], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
 
-    // ダウンロードリンクを生成してテキストファイルを保存
     const link = document.createElement("a");
     link.href = url;
     link.download = "audio_analysis.txt";
@@ -95,29 +94,6 @@ convertButton.addEventListener("click", async () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
-    // 解析された情報に基づいて新しいMP3を作成
-    await ffmpeg.run(
-      "-f",
-      "lavfi",
-      "-i",
-      "sine=frequency=1000:duration=10",
-      "output.mp3"
-    );
-
-    // MP3ファイルをダウンロードリンクとして提供
-    const mp3Blob = ffmpeg.FS("readFile", "output.mp3");
-    const mp3Url = URL.createObjectURL(
-      new Blob([mp3Blob.buffer], { type: "audio/mpeg" })
-    );
-
-    const mp3Link = document.createElement("a");
-    mp3Link.href = mp3Url;
-    mp3Link.download = "output.mp3";
-    mp3Link.style.display = "none";
-    document.body.appendChild(mp3Link);
-    mp3Link.click();
-    document.body.removeChild(mp3Link);
 
     output.textContent = "Processing complete!";
   } catch (error) {
