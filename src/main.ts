@@ -41,6 +41,8 @@ async function trimVideo(
     ),
   };
 
+  console.warn(config);
+
   await ffmpeg.load(config);
 
   console.warn("ffmpeg loaded");
