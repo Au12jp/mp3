@@ -1,5 +1,7 @@
 import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 
+console.log(1);
+
 const ffmpeg = createFFmpeg({
   log: true, // ログを有効化
 });
