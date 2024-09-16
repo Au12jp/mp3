@@ -1,4 +1,5 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 // HTML要素を取得
@@ -31,14 +32,16 @@ async function trimVideo(
 
   const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
 
-  await ffmpeg.load({
+  const config: FFMessageLoadConfig = {
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
     workerURL: await toBlobURL(
       `${baseURL}/ffmpeg-core.worker.js`,
       "text/javascript"
     ),
-  });
+  };
+
+  await ffmpeg.load(config);
 
   console.warn("ffmpeg loaded");
 
