@@ -1,56 +1,58 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
+import { toBlobURL } from "@ffmpeg/util";
+
+let ffmpeg: FFmpeg | null = null;
 
 self.addEventListener("message", async (event: MessageEvent) => {
-  const { command, file, startTime, endTime } = event.data;
+  const { command, args } = event.data;
 
-  if (command === "trim") {
-    const trimmedVideoUrl = await trimVideo(file, startTime, endTime);
-    self.postMessage({ trimmedVideoUrl });
+  switch (command) {
+    case "load":
+      await loadFFmpeg();
+      break;
+    case "run":
+      if (ffmpeg && Array.isArray(args)) {
+        const result = await ffmpeg.exec(args);
+        self.postMessage({ result });
+      }
+      break;
+    default:
+      console.error(`Unknown command: ${command}`);
   }
 });
 
-// Function to trim the video
-async function trimVideo(
-  file: File,
-  startTime: string,
-  endTime: string
-): Promise<string | null> {
-  const ffmpeg = new FFmpeg();
-  const baseURL = "./core-mt"; // Point to your local FFmpeg files
+async function loadFFmpeg() {
+  try {
+    if (ffmpeg === null) {
+      ffmpeg = new FFmpeg();
+      const baseURL = "./core-mt";
 
-  // FFmpeg loading and worker setup
-  await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.worker.js`,
-      "text/javascript"
-    ),
-  });
+      const config: FFMessageLoadConfig = {
+        classWorkerURL: await toBlobURL(
+          `${baseURL}/worker.js`,
+          "text/javascript"
+        ),
+        coreURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.js`,
+          "text/javascript"
+        ),
+        wasmURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.wasm`,
+          "application/wasm"
+        ),
+        workerURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.worker.js`,
+          "text/javascript"
+        ),
+      };
 
-  // Write the input file to FFmpeg's filesystem
-  await ffmpeg.writeFile("input.mp4", await fetchFile(file));
-
-  const duration = (parseInt(endTime) - parseInt(startTime)).toString();
-
-  // Execute the FFmpeg trim command
-  await ffmpeg.exec([
-    "-i",
-    "input.mp4",
-    "-ss",
-    startTime,
-    "-t",
-    duration,
-    "output.mp4",
-  ]);
-
-  // Read the output file and create a Blob URL for it
-  const data = await ffmpeg.readFile("output.mp4");
-  const videoBlob = new Blob([new Uint8Array(data as Uint8Array)], {
-    type: "video/mp4",
-  });
-
-  // Return the Blob URL
-  return URL.createObjectURL(videoBlob);
+      await ffmpeg.load(config);
+      self.postMessage({ status: "loaded" });
+    } else {
+      self.postMessage({ status: "already-loaded" });
+    }
+  } catch (error) {
+    self.postMessage({ status: "error", message: error });
+  }
 }
