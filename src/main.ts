@@ -28,7 +28,7 @@ async function trimVideo(
   endTime: string
 ): Promise<string | null> {
   const ffmpeg = new FFmpeg();
-  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
+  const baseURL = "https://unpkg.com/browse/@ffmpeg/core-mt@0.12.6/dist/esm/";
 
   // FFmpegの各種ファイルをロード
   await ffmpeg.load({
