@@ -28,11 +28,10 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Build static files
+      - name: Delete old GitHub Pages deployment
         run: |
-          # npm install && npm run build のようなビルドステップが必要な場合にここで実行
-          echo "Building static files..."
-          # 例: npm install && npm run build
+          gh api repos/{owner}/{repo}/pages/deployment --method DELETE
+          echo "Old deployments deleted"
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
