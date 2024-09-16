@@ -29,8 +29,12 @@ async function trimVideo(
 ): Promise<string | null> {
   const ffmpeg = new FFmpeg();
 
-  await ffmpeg.load();
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
 
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+  });
   // 入力ファイルをFFmpegの仮想ファイルシステムに書き込み
   await ffmpeg.writeFile("input.mp4", await fetchFile(file));
 
