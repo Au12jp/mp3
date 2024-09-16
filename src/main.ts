@@ -29,12 +29,15 @@ async function trimVideo(
 ): Promise<string | null> {
   const ffmpeg = new FFmpeg();
 
-  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm";
+  const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
 
   await ffmpeg.load({
     coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
   });
+
+  console.warn("ffmpeg loaded");
+
   // 入力ファイルをFFmpegの仮想ファイルシステムに書き込み
   await ffmpeg.writeFile("input.mp4", await fetchFile(file));
 
