@@ -3,6 +3,26 @@ import JSZip from "jszip";
 import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { toBlobURL } from "@ffmpeg/util";
 
+export type WorkerCommand = "load" | "createPack" | "getPack";
+
+export interface WorkerMessage {
+  command: WorkerCommand;
+  args: any[];
+}
+
+export interface WriteFileArgs {
+  fileName: string;
+  fileData: Uint8Array;
+}
+
+export interface ReadFileArgs {
+  fileName: string;
+}
+
+export interface RunCommandArgs {
+  commandArgs: string[];
+}
+
 const ffmpeg = new FFmpeg();
 let zip: JSZip | null = null;
 let ffmpegLoaded = false; // FFmpegがロードされたかどうかを追跡する変数

@@ -1,26 +1,27 @@
-// Workerへのコマンド送信を簡単に行うヘルパー関数
+import { fetchFile } from "@ffmpeg/util";
+import { WorkerCommand, WorkerMessage } from "./core-mt/worker";
+
+const worker = new Worker("./core-mt/worker.js");
+
 function sendWorkerCommand<T = any>(
-  command: string,
+  command: WorkerCommand,
   args: any[] = []
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker("./core-mt/worker.js");
-    worker.postMessage({ command, args });
+    worker.postMessage({ command, args } as WorkerMessage);
     worker.onmessage = (event) => {
-      const { status, result, message, percent, estimatedRemainingTime } =
-        event.data;
-
-      if (status === "error") {
-        reject(message);
-      } else if (status === "progress") {
-        updateProgress(percent, estimatedRemainingTime);
+      if (event.data.status === "error") {
+        reject(event.data.message);
+      } else if (event.data.status === "progress") {
+        const { percent, estimatedRemainingTime } = event.data;
+        progressBar.style.width = `${percent}%`;
+        timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;
       } else {
-        resolve(result);
+        resolve(event.data.result);
       }
     };
   });
 }
-
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const createPackButton = document.getElementById(
   "createPackButton"
