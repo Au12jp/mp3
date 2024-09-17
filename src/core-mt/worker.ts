@@ -45,7 +45,7 @@ self.addEventListener("message", async (event: MessageEvent) => {
 
 // FFmpegのロード
 async function loadFFmpeg() {
-  const baseURL = "./core-mt";
+  const baseURL = ".";
 
   const config: FFMessageLoadConfig = {
     classWorkerURL: await toBlobURL(`${baseURL}/worker.js`, "text/javascript"),
