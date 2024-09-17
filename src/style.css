@@ -1,86 +1,71 @@
-/* style.css */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
   font-family: Arial, sans-serif;
-  background-color: #f0f0f0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 0;
 }
 
 .container {
-  background-color: white;
+  max-width: 600px;
+  margin: 50px auto;
   padding: 20px;
+  background-color: #fff;
   border-radius: 10px;
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-  width: 300px;
-  text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
-  margin-bottom: 20px;
-  font-size: 20px;
-  color: #333;
-}
-
-.input-container,
-.time-inputs {
-  margin-bottom: 15px;
+  text-align: center;
 }
 
 label {
-  font-size: 14px;
-  color: #333;
+  display: block;
+  margin-top: 15px;
 }
 
+input[type="file"],
 input[type="number"] {
-  padding: 5px;
-  margin: 5px 0;
   width: 100%;
-}
-
-button {
-  background-color: #007bff;
-  color: white;
-  padding: 10px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
   margin-bottom: 15px;
 }
 
+button {
+  width: 100%;
+  padding: 12px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
 button:hover {
-  background-color: #0056b3;
+  background-color: #45a049;
 }
 
 #progressContainer {
-  background-color: #e0e0e0;
+  width: 100%;
+  background-color: #ddd;
+  height: 30px;
   border-radius: 5px;
-  overflow: hidden;
-  margin-bottom: 10px;
+  margin-top: 20px;
 }
 
 #progress {
-  height: 15px;
+  width: 0;
+  height: 100%;
   background-color: #4caf50;
-  width: 0%;
-  transition: width 0.5s;
+  border-radius: 5px;
 }
 
 #timeRemaining {
-  font-size: 14px;
-  color: #555;
+  text-align: center;
+  margin-top: 10px;
 }
 
-video {
-  margin-top: 15px;
-  width: 100%;
-  border-radius: 5px;
+#status {
+  text-align: center;
+  margin-top: 20px;
 }

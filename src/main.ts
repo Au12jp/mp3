@@ -1,93 +1,93 @@
-import { fetchFile } from "@ffmpeg/util";
-import { WorkerCommand, WorkerMessage } from "./core-mt/worker";
-
-const worker = new Worker("./core-mt/worker.js");
-
-const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-const trimButton = document.getElementById("trimButton") as HTMLButtonElement;
-const videoOutput = document.getElementById("videoOutput") as HTMLVideoElement;
-const progressBar = document.getElementById("progress") as HTMLDivElement;
-const timeRemainingDisplay = document.getElementById(
-  "timeRemaining"
-) as HTMLDivElement;
-
+// Workerへのコマンド送信を簡単に行うヘルパー関数
 function sendWorkerCommand<T = any>(
-  command: WorkerCommand,
+  command: string,
   args: any[] = []
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    worker.postMessage({ command, args } as WorkerMessage);
+    const worker = new Worker("./core-mt/worker.js");
+    worker.postMessage({ command, args });
     worker.onmessage = (event) => {
-      if (event.data.status === "error") {
-        reject(event.data.message);
-      } else if (event.data.status === "progress") {
-        const { percent, estimatedRemainingTime } = event.data;
-        progressBar.style.width = `${percent}%`;
-        timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;
+      const { status, result, message, percent, estimatedRemainingTime } =
+        event.data;
+
+      if (status === "error") {
+        reject(message);
+      } else if (status === "progress") {
+        updateProgress(percent, estimatedRemainingTime);
       } else {
-        resolve(event.data.result);
+        resolve(result);
       }
     };
   });
 }
 
+const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+const createPackButton = document.getElementById(
+  "createPackButton"
+) as HTMLButtonElement;
+const progressBar = document.getElementById("progress") as HTMLDivElement;
+const timeRemainingDisplay = document.getElementById(
+  "timeRemaining"
+) as HTMLDivElement;
+const statusDisplay = document.getElementById("status") as HTMLDivElement;
+
+// FFmpegのロード処理
 async function loadFFmpeg() {
   try {
-    console.log("Loading FFmpeg...");
+    statusDisplay.innerText = "Loading FFmpeg...";
     await sendWorkerCommand("load");
-    console.log("FFmpeg loaded.");
+    statusDisplay.innerText = "FFmpeg loaded.";
   } catch (error) {
+    statusDisplay.innerText = "Error loading FFmpeg.";
     console.error("Error loading FFmpeg:", error);
   }
 }
 
-async function trimVideo(file: File, startTime: string, endTime: string) {
-  console.log("Sending video trimming command to worker...");
+// パック生成処理
+async function createBPandRP(file: File, frameCount: number, fps: number) {
+  statusDisplay.innerText = "Creating BP and RP...";
 
-  const inputFileData = await fetchFile(file);
-  const duration = (parseInt(endTime) - parseInt(startTime)).toString();
-  const args = [
-    "-i",
-    "input.mp4",
-    "-ss",
-    startTime,
-    "-t",
-    duration,
-    "output.mp4",
-  ];
+  const inputFileData = new Uint8Array(await file.arrayBuffer());
 
-  console.log("Writing file to FFmpeg...");
-  await sendWorkerCommand<void>("writeFile", ["input.mp4", inputFileData]);
+  await sendWorkerCommand("createPack", [inputFileData, frameCount, fps]);
 
-  console.log("Running FFmpeg...");
-  await sendWorkerCommand<void>("run", args);
+  const result = await sendWorkerCommand<Blob>("getPack");
+  const downloadLink = document.createElement("a");
+  downloadLink.href = URL.createObjectURL(result);
+  downloadLink.download = "generated_pack.mcaddon";
+  downloadLink.click();
 
-  console.log("Reading output file from FFmpeg...");
-  const output = await sendWorkerCommand<Uint8Array>("readFile", [
-    "output.mp4",
-  ]);
-
-  const videoBlob = new Blob([new Uint8Array(output)], { type: "video/mp4" });
-
-  return URL.createObjectURL(videoBlob);
+  statusDisplay.innerText = "Pack creation complete!";
 }
-trimButton.addEventListener("click", async () => {
-  if (!fileInput.files || fileInput.files.length === 0) {
+
+// ボタンイベント
+createPackButton.addEventListener("click", async () => {
+  const file = fileInput.files?.[0];
+  if (!file) {
     alert("Please select a video file.");
     return;
   }
 
-  console.log("Starting trimming process...");
-
-  const start = (document.getElementById("start") as HTMLInputElement).value;
-  const end = (document.getElementById("end") as HTMLInputElement).value;
+  const frameCount = parseInt(
+    (document.getElementById("frameCount") as HTMLInputElement).value
+  );
+  const fps = parseInt(
+    (document.getElementById("fps") as HTMLInputElement).value
+  );
 
   try {
-    const trimmedVideoUrl = await trimVideo(fileInput.files[0], start, end);
-    videoOutput.src = trimmedVideoUrl;
+    await createBPandRP(file, frameCount, fps);
   } catch (error) {
-    console.error("Error during video trimming:", error);
+    statusDisplay.innerText = "Error during pack creation.";
+    console.error("Error during pack creation:", error);
   }
 });
 
+// 進捗バーや残り時間の更新
+function updateProgress(percent: number, estimatedRemainingTime: number) {
+  progressBar.style.width = `${percent}%`;
+  timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;
+}
+
+// FFmpegのロード開始
 loadFFmpeg().catch(console.error);

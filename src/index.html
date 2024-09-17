@@ -3,35 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Video Trimmer</title>
+    <title>Minecraft BP/RP Generator</title>
     <link rel="stylesheet" href="style.css" />
     <script src="coi-serviceworker.js"></script>
   </head>
   <body>
     <div class="container">
-      <h1>Video Trimming with FFmpeg</h1>
+      <h1>Minecraft BP/RP Generator</h1>
+      <p>Select a video to generate Minecraft BP and RP packs.</p>
 
-      <div class="input-container">
-        <label for="fileInput">Select a Video File:</label>
-        <input type="file" id="fileInput" accept="video/*" />
-      </div>
+      <label for="fileInput">Select Video File:</label>
+      <input type="file" id="fileInput" accept="video/*" />
 
-      <div class="time-inputs">
-        <label for="start">Start Time (in seconds):</label>
-        <input type="number" id="start" placeholder="0" />
-        <label for="end">End Time (in seconds):</label>
-        <input type="number" id="end" placeholder="10" />
-      </div>
+      <label for="frameCount">Frame Count:</label>
+      <input type="number" id="frameCount" value="200" min="1" />
 
-      <button id="trimButton">Trim Video</button>
+      <label for="fps">Frame Rate (Max 20):</label>
+      <input type="number" id="fps" value="20" min="1" max="20" />
+
+      <button id="createPackButton">Create BP/RP Packs</button>
 
       <div id="progressContainer">
         <div id="progress"></div>
       </div>
-      <div id="timeRemaining">Estimated Time Left: 0s</div>
 
-      <video id="videoOutput" controls></video>
+      <div id="timeRemaining"></div>
+      <div id="status"></div>
     </div>
-    <script type="module" src="main.js"></script>
+
+    <script src="main.js"></script>
   </body>
 </html>

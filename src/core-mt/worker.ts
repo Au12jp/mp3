@@ -1,156 +1,107 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
+import JSZip from "jszip";
 import { FFMessageLoadConfig } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { toBlobURL } from "@ffmpeg/util";
 
-export type WorkerCommand = "load" | "writeFile" | "readFile" | "run";
+const ffmpeg = new FFmpeg();
+let zip: JSZip | null = null;
 
-export interface WorkerMessage {
-  command: WorkerCommand;
-  args: any[];
-}
-
-export interface WriteFileArgs {
-  fileName: string;
-  fileData: Uint8Array;
-}
-
-export interface ReadFileArgs {
-  fileName: string;
-}
-
-export interface RunCommandArgs {
-  commandArgs: string[];
-}
-
-export let ffmpeg: FFmpeg | null = null;
-
-self.addEventListener("message", async (event: MessageEvent<WorkerMessage>) => {
+self.addEventListener("message", async (event: MessageEvent) => {
   const { command, args } = event.data;
-
-  if (!ffmpeg && command !== "load") {
-    self.postMessage({ status: "error", message: "FFmpeg is not loaded." });
-    return;
-  }
 
   switch (command) {
     case "load":
       await loadFFmpeg();
       break;
-    case "writeFile":
-      await handleWriteFile(args as unknown as WriteFileArgs);
+    case "createPack":
+      await createBPandRP(args[0], args[1], args[2]);
       break;
-    case "readFile":
-      await handleReadFile(args as unknown as ReadFileArgs);
-      break;
-    case "run":
-      await handleRun(args as unknown as RunCommandArgs);
+    case "getPack":
+      const pack = await getGeneratedPack();
+      self.postMessage({ status: "completed", result: pack });
       break;
     default:
-      console.error(`Unknown command: ${command}`);
+      self.postMessage({
+        status: "error",
+        message: `Unknown command: ${command}`,
+      });
   }
 });
 
+// FFmpegのロード
 async function loadFFmpeg() {
-  try {
-    if (ffmpeg === null) {
-      ffmpeg = new FFmpeg();
-      const baseURL = ".";
+  const baseURL = ".";
 
-      const config: FFMessageLoadConfig = {
-        classWorkerURL: await toBlobURL(
-          `${baseURL}/worker.js`,
-          "text/javascript"
-        ),
-        coreURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.js`,
-          "text/javascript"
-        ),
-        wasmURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.wasm`,
-          "application/wasm"
-        ),
-        workerURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.worker.js`,
-          "text/javascript"
-        ),
-      };
+  const config: FFMessageLoadConfig = {
+    classWorkerURL: await toBlobURL(`${baseURL}/worker.js`, "text/javascript"),
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL: await toBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ),
+  };
 
-      await ffmpeg.load(config);
-      self.postMessage({ status: "loaded" });
-    } else {
-      self.postMessage({ status: "already-loaded" });
-    }
-  } catch (error) {
-    self.postMessage({
-      status: "error",
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
+  console.warn(config);
+
+  await ffmpeg.load(config);
+  zip = new JSZip();
 }
 
-async function handleWriteFile(args: WriteFileArgs) {
-  try {
-    if (ffmpeg) {
-      await ffmpeg.writeFile(args.fileName, args.fileData);
-      self.postMessage({ status: "file-written" });
-    }
-  } catch (error) {
+// BPとRPのパック生成
+async function createBPandRP(
+  inputFileData: Uint8Array,
+  frameCount: number,
+  fps: number
+) {
+  zip = new JSZip();
+
+  // 動画からフレームを生成
+  await ffmpeg.writeFile("input.mp4", inputFileData);
+  await ffmpeg.exec(["-i", "input.mp4", "-vf", `fps=${fps}`, "output%d.png"]);
+
+  for (let i = 1; i <= frameCount; i++) {
+    const frame = await ffmpeg.readFile(`output${i}.png`);
+    zip.file(`RP/textures/video/frame${i}.png`, frame);
+
+    // 進捗を計算
+    const percent = (i / frameCount) * 100;
+    const estimatedRemainingTime = ((frameCount - i) / fps).toFixed(2);
+
+    // 進捗をメインスレッドに送信
     self.postMessage({
-      status: "error",
-      message: error instanceof Error ? error.message : String(error),
+      status: "progress",
+      percent,
+      estimatedRemainingTime,
     });
   }
+
+  // OGG音声を生成
+  await ffmpeg.exec([
+    "-i",
+    "input.mp4",
+    "-vn",
+    "-c:a",
+    "libvorbis",
+    "output.ogg",
+  ]);
+  const oggAudio = await ffmpeg.readFile("output.ogg");
+  zip.file("RP/sounds/sound.ogg", oggAudio);
+
+  // BPデータ.js
+  zip.file(
+    "BP/scripts/data.js",
+    `export const frameCount = ${frameCount};\nexport const fps = ${fps};`
+  );
+
+  self.postMessage({ status: "pack-created" });
 }
 
-async function handleReadFile(args: ReadFileArgs) {
-  try {
-    if (ffmpeg) {
-      const data = await ffmpeg.readFile(args.fileName);
-      self.postMessage({ result: data });
-    }
-  } catch (error) {
-    self.postMessage({
-      status: "error",
-      message: error instanceof Error ? error.message : String(error),
-    });
+// パックをZIP形式で取得
+async function getGeneratedPack(): Promise<Blob> {
+  if (!zip) {
+    throw new Error("Pack is not generated.");
   }
-}
 
-async function handleRun(args: RunCommandArgs) {
-  try {
-    if (ffmpeg) {
-      let startTime = performance.now();
-
-      console.log("Running FFmpeg with arguments:", args.commandArgs);
-      ffmpeg.on("progress", ({ progress, time }) => {
-        const elapsedTime = (performance.now() - startTime) / 1000;
-        const percent = progress * 100;
-        const estimatedTotalTime = elapsedTime / progress;
-        const estimatedRemainingTime = estimatedTotalTime - elapsedTime;
-
-        console.log(
-          `Progress: ${Math.round(percent)}%, Time Left: ${Math.round(
-            estimatedRemainingTime
-          )}s`
-        );
-
-        self.postMessage({
-          status: "progress",
-          percent: Math.round(percent),
-          elapsedTime: Math.round(elapsedTime),
-          estimatedRemainingTime: Math.round(estimatedRemainingTime),
-        });
-      });
-
-      const result = await ffmpeg.exec(args.commandArgs);
-      console.log("FFmpeg execution completed");
-      self.postMessage({ status: "execution-completed", result });
-    }
-  } catch (error) {
-    console.error("Error during FFmpeg execution:", error);
-    self.postMessage({
-      status: "error",
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
+  return await zip.generateAsync({ type: "blob" });
 }
