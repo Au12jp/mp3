@@ -5,6 +5,7 @@ import { toBlobURL } from "@ffmpeg/util";
 
 const ffmpeg = new FFmpeg();
 let zip: JSZip | null = null;
+let ffmpegLoaded = false; // FFmpegがロードされたかどうかを追跡する変数
 
 self.addEventListener("message", async (event: MessageEvent) => {
   const { command, args } = event.data;
@@ -14,9 +15,23 @@ self.addEventListener("message", async (event: MessageEvent) => {
       await loadFFmpeg();
       break;
     case "createPack":
+      if (!ffmpegLoaded) {
+        self.postMessage({
+          status: "error",
+          message: "FFmpeg is not loaded yet.",
+        });
+        return;
+      }
       await createBPandRP(args[0], args[1], args[2]);
       break;
     case "getPack":
+      if (!zip) {
+        self.postMessage({
+          status: "error",
+          message: "No pack generated yet.",
+        });
+        return;
+      }
       const pack = await getGeneratedPack();
       self.postMessage({ status: "completed", result: pack });
       break;
@@ -30,7 +45,7 @@ self.addEventListener("message", async (event: MessageEvent) => {
 
 // FFmpegのロード
 async function loadFFmpeg() {
-  const baseURL = ".";
+  const baseURL = "./core-mt";
 
   const config: FFMessageLoadConfig = {
     classWorkerURL: await toBlobURL(`${baseURL}/worker.js`, "text/javascript"),
@@ -42,10 +57,9 @@ async function loadFFmpeg() {
     ),
   };
 
-  console.warn(config);
-
   await ffmpeg.load(config);
-  zip = new JSZip();
+  ffmpegLoaded = true; // FFmpegのロードが完了したことをマーク
+  self.postMessage({ status: "loaded" });
 }
 
 // BPとRPのパック生成
