@@ -33,16 +33,22 @@ convertButton.addEventListener("click", async () => {
 
 async function extractMediaAndZip(inputFile: string) {
   const ffmpeg = new FFmpeg();
-  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
+  const CORE_VERSION = "0.12.6"; // 使用するバージョンを指定
 
-  // FFmpegの初期化
   await ffmpeg.load({
-    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
-    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
-    workerURL: await toBlobURL(
-      `${baseURL}/ffmpeg-core.worker.js`,
+    coreURL: await toBlobURL(
+      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
       "text/javascript"
     ),
+    wasmURL: await toBlobURL(
+      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
+      "application/wasm"
+    ),
+    workerURL: await toBlobURL(
+      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ),
+    classWorkerURL: "./worker.js", // worker.ts からコンパイルされたworker.jsを使用
   });
 
   console.warn("ffmpeg loaded");
@@ -59,7 +65,7 @@ async function extractMediaAndZip(inputFile: string) {
     "fps=1", // 1フレーム毎秒で抽出
     "-q:v",
     "3",
-    "output_%03d.png",
+    "output_%d.png",
   ]);
   console.warn("output images written");
 
