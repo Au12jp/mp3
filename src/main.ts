@@ -98,20 +98,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     logToUI("画像がフレームごとに抽出されました。");
 
     // 音声をOGG形式で抽出
-    await ffmpeg.exec([
-      "-i",
-      "input.mp4",
-      "-q:a",
-      "0",
-      "-map",
-      "a",
-      "output.ogg",
-    ]);
+    ffmpeg.exec(["-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg"]);
     logToUI("音声がOGG形式で抽出されました。");
 
     // 出力ファイルを読み込む
     //@ts-ignore
-    let audioData: FileData = await ffmpeg.readFile("output.ogg");
+    let audioData: FileData = ffmpeg.readFile("output.ogg");
     if (typeof audioData === "string") {
       audioData = stringToUint8Array(audioData); // stringからUint8Arrayに変換
     }
@@ -122,7 +114,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     while (true) {
       try {
         //@ts-ignore
-        let imageData: FileData = await ffmpeg.readFile(
+        let imageData: FileData = ffmpeg.readFile(
           `output_${String(i).padStart(3, "0")}.png`
         );
         if (typeof imageData === "string") {
