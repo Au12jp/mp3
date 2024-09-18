@@ -15,6 +15,7 @@ const downloadLinkContainer = document.getElementById(
 const statusMessage = document.getElementById(
   "statusMessage"
 ) as HTMLParagraphElement; // 状態表示用の要素
+const logMessage = document.getElementById("logMessage") as HTMLPreElement; // FFmpegのログ表示用の要素
 
 fileInput.addEventListener("change", () => {
   if (fileInput.files?.length) {
@@ -131,6 +132,18 @@ async function extractMediaAndZip(
 export async function loadFFmpeg(): Promise<FFmpeg> {
   const ffmpeg = new FFmpeg();
   const CORE_VERSION = "0.12.6"; // 使用するバージョンを指定
+
+  // FFmpegのログ表示
+  ffmpeg.on("log", ({ type, message }) => {
+    logMessage.textContent += `[${type}] ${message}\n`; // ログを追加
+  });
+
+  // FFmpegの進捗表示
+  ffmpeg.on("progress", ({ progress, time }) => {
+    statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
+      2
+    )}% - 時間: ${time}`;
+  });
 
   // FFmpegの初期化
   await ffmpeg.load({
