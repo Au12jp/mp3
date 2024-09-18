@@ -155,7 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     logToUI("FFmpegをロード中...");
 
-    const config = {
+    ffmpeg.load({
       coreURL: await toBlobURL(
         `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
         "text/javascript"
@@ -169,11 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         "text/javascript"
       ),
       classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
-    };
-
-    logToUI("configが正常にロードされました。");
-
-    ffmpeg.load(config);
+    });
 
     logToUI("FFmpegが正常にロードされました。");
 
