@@ -131,15 +131,15 @@ async function extractMediaAndZip(
  */
 export async function loadFFmpeg(): Promise<FFmpeg> {
   const ffmpeg = new FFmpeg();
-  const CORE_VERSION = "0.12.1";
+  const CORE_VERSION = "0.12.6";
 
   await ffmpeg.load({
     coreURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
+      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
       "text/javascript"
     ),
     wasmURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
+      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
       "application/wasm"
     ),
     workerURL: await toBlobURL(
