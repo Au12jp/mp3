@@ -53,8 +53,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         logToUI("コンバートが開始されました...");
         convertButton!.disabled = true; // ボタンを無効化
 
-        logToUI("FFmpegが正常にロードされました。");
-
         // メディアの処理とZIP作成
         const zipUrl = await extractMediaAndZip(ffmpegPromise, url);
 
@@ -84,11 +82,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     inputFile: string
   ): Promise<string> {
     logToUI("MP4ファイルをFFmpegに読み込み中...");
-    await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
+    ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
     logToUI("input.mp4が書き込まれました。");
 
     // 映像をフレームごとに番号付きの画像（PNG）として抽出
-    await ffmpeg.exec([
+    ffmpeg.exec([
       "-i",
       "input.mp4",
       "-vf",
@@ -100,15 +98,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     logToUI("画像がフレームごとに抽出されました。");
 
     // 音声をOGG形式で抽出
-    await ffmpeg.exec([
-      "-i",
-      "input.mp4",
-      "-q:a",
-      "0",
-      "-map",
-      "a",
-      "output.ogg",
-    ]);
+    ffmpeg.exec(["-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg"]);
     logToUI("音声がOGG形式で抽出されました。");
 
     // 出力ファイルを読み込む
@@ -170,8 +160,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       ),
       classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
     });
-
-    logToUI("FFmpegが正常にロードされました。");
 
     // ログイベントの設定
     ffmpeg.on("log", ({ type, message }) => {
