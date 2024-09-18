@@ -1,14 +1,17 @@
 import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { FileData } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import JSZip from "jszip";
 
-const ffmpeg = loadFFmpeg(); // FFmpegをロードする専用関数を呼び出し
+const ffmpegPromise: Promise<FFmpeg> = loadFFmpeg();
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
 ) as HTMLButtonElement;
-const downloadLinkContainer = document.getElementById("downloadLinkContainer");
+const downloadLinkContainer = document.getElementById(
+  "downloadLinkContainer"
+) as HTMLDivElement;
 
 fileInput.addEventListener("change", () => {
   if (fileInput.files?.length) {
@@ -22,6 +25,7 @@ convertButton.addEventListener("click", async () => {
     const url = URL.createObjectURL(file);
 
     try {
+      const ffmpeg = await ffmpegPromise; // FFmpegロード待ち
       const zipUrl = await extractMediaAndZip(ffmpeg, url);
 
       const link = document.createElement("a");
@@ -29,10 +33,10 @@ convertButton.addEventListener("click", async () => {
       link.download = "media.zip";
       link.textContent = "Download ZIP";
 
-      downloadLinkContainer!.innerHTML = ""; // Clear previous link
-      downloadLinkContainer!.appendChild(link);
+      downloadLinkContainer.innerHTML = ""; // 前のリンクをクリア
+      downloadLinkContainer.appendChild(link);
     } catch (error) {
-      console.error("FFmpeg loading failed", error);
+      console.error("FFmpeg loading or execution failed", error);
     }
   }
 });
@@ -44,7 +48,7 @@ convertButton.addEventListener("click", async () => {
  * @returns ZIPファイルのURL
  */
 async function extractMediaAndZip(
-  ffmpeg: any,
+  ffmpeg: FFmpeg,
   inputFile: string
 ): Promise<string> {
   // MP4ファイルをFFmpegに読み込み
@@ -56,7 +60,7 @@ async function extractMediaAndZip(
     "-i",
     "input.mp4",
     "-vf",
-    "fps=1", // 1フレーム毎秒で抽出
+    "fps=1",
     "-q:v",
     "3",
     "output_%03d.png",
@@ -76,31 +80,37 @@ async function extractMediaAndZip(
   console.warn("output.ogg written");
 
   // 出力ファイルを読み込む
-  const audioData = await ffmpeg.readFile("output.ogg");
+  let audioData: FileData = await ffmpeg.readFile("output.ogg");
+  if (typeof audioData === "string") {
+    audioData = stringToUint8Array(audioData); // stringからUint8Arrayに変換
+  }
 
   // 生成された画像の読み込み
   const zip = new JSZip();
   let i = 1;
   while (true) {
     try {
-      const imageData = await ffmpeg.readFile(
+      let imageData: FileData = await ffmpeg.readFile(
         `output_${String(i).padStart(3, "0")}.png`
       );
-      zip.file(`image_${i}.png`, imageData);
+      if (typeof imageData === "string") {
+        imageData = stringToUint8Array(imageData); // stringからUint8Arrayに変換
+      }
+      zip.file(`image_${i}.png`, imageData as Uint8Array); // 型キャスト
       i++;
     } catch (e) {
-      break;
+      break; // ファイルが見つからない場合ループを終了
     }
   }
 
   console.warn("Images and audio extracted");
 
   // ZIPファイルに音声を追加
-  zip.file("output.ogg", audioData);
+  zip.file("output.ogg", audioData as Uint8Array); // 型キャスト
 
   // ZIPファイルを生成してBlobに変換
-  const zipBlob = await zip.generateAsync({ type: "blob" });
-  const zipURL = URL.createObjectURL(zipBlob);
+  const zipBlob: Blob = await zip.generateAsync({ type: "blob" });
+  const zipURL: string = URL.createObjectURL(zipBlob);
 
   return zipURL;
 }
@@ -132,4 +142,14 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
 
   console.log("FFmpeg core loaded successfully");
   return ffmpeg;
+}
+
+function stringToUint8Array(data: string): Uint8Array {
+  const binaryString = atob(data); // Base64エンコードされた文字列をデコード
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
