@@ -4,15 +4,7 @@ import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import JSZip from "jszip";
 
 // メインの処理をDOMContentLoadedイベント内で実行
-document.addEventListener("DOMContentLoaded", () => {
-  const logMessage = document.getElementById(
-    "logMessage"
-  ) as HTMLPreElement | null;
-  console.log("logMessage要素:", logMessage); // ここで要素が取得できているか確認する
-
-  if (!logMessage) {
-    console.error("logMessageが見つかりません。");
-  }
+document.addEventListener("DOMContentLoaded", async () => {
   // HTML要素の取得
   const fileInput = document.getElementById(
     "fileInput"
@@ -26,8 +18,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusMessage = document.getElementById(
     "statusMessage"
   ) as HTMLParagraphElement | null;
-
-  const ffmpegPromise: Promise<FFmpeg> = loadFFmpeg();
+  const logMessage = document.getElementById(
+    "logMessage"
+  ) as HTMLPreElement | null;
 
   // ログをUIに表示する関数
   const logToUI = (message: string) => {
@@ -38,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("logMessage要素が見つかりません。");
     }
   };
+
+  const ffmpegPromise = await loadFFmpeg();
 
   // ファイル選択時の処理
   fileInput?.addEventListener("change", () => {
@@ -58,11 +53,10 @@ document.addEventListener("DOMContentLoaded", () => {
         logToUI("コンバートが開始されました...");
         convertButton!.disabled = true; // ボタンを無効化
 
-        const ffmpeg = await ffmpegPromise; // FFmpegロード待ち
         logToUI("FFmpegが正常にロードされました。");
 
         // メディアの処理とZIP作成
-        const zipUrl = await extractMediaAndZip(ffmpeg, url);
+        const zipUrl = await extractMediaAndZip(ffmpegPromise, url);
 
         // ダウンロードリンクの作成
         if (downloadLinkContainer) {
