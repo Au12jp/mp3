@@ -155,48 +155,53 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     logToUI("FFmpegをロード中...");
 
-    try {
-      await ffmpeg.load({
-        coreURL: await toBlobURL(
-          `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
-          "text/javascript"
-        ),
-        wasmURL: await toBlobURL(
-          `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
-          "application/wasm"
-        ),
-        workerURL: await toBlobURL(
-          `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
-          "text/javascript"
-        ),
-        classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
-      });
-
-      // ログイベントの設定
-      ffmpeg.on("log", ({ type, message }) => {
-        logToUI(`[${type}] ${message}`);
-      });
-
-      // 進捗イベントの設定
-      ffmpeg.on("progress", ({ progress, time }) => {
-        if (statusMessage) {
-          statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
-            2
-          )}% - 時間: ${time}`;
-        }
-        logToUI(`進行状況: ${(progress * 100).toFixed(2)}% - 時間: ${time}`);
-      });
-
-      logToUI("FFmpegが正常にロードされました。");
+    if (ffmpeg.loaded) {
+      logToUI("a");
       return ffmpeg;
-    } catch (error) {
-      if (error instanceof Error) {
-        console.error("FFmpegのロード中にエラーが発生しました:", error);
-        logToUI(`エラー: ${error.message}`);
-      } else {
-        logToUI("不明なエラーが発生しました。");
+    } else {
+      try {
+        await ffmpeg.load({
+          coreURL: await toBlobURL(
+            `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
+            "text/javascript"
+          ),
+          wasmURL: await toBlobURL(
+            `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
+            "application/wasm"
+          ),
+          workerURL: await toBlobURL(
+            `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
+            "text/javascript"
+          ),
+          classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
+        });
+
+        // ログイベントの設定
+        ffmpeg.on("log", ({ type, message }) => {
+          logToUI(`[${type}] ${message}`);
+        });
+
+        // 進捗イベントの設定
+        ffmpeg.on("progress", ({ progress, time }) => {
+          if (statusMessage) {
+            statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
+              2
+            )}% - 時間: ${time}`;
+          }
+          logToUI(`進行状況: ${(progress * 100).toFixed(2)}% - 時間: ${time}`);
+        });
+
+        logToUI("FFmpegが正常にロードされました。");
+        return ffmpeg;
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error("FFmpegのロード中にエラーが発生しました:", error);
+          logToUI(`エラー: ${error.message}`);
+        } else {
+          logToUI("不明なエラーが発生しました。");
+        }
+        throw error; // エラーを再スローして呼び出し元で処理できるようにする
       }
-      throw error; // エラーを再スローして呼び出し元で処理できるようにする
     }
   }
 
