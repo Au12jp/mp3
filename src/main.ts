@@ -5,47 +5,54 @@ import JSZip from "jszip";
 
 // FFmpegの初期化とロードを行うPromise
 const ffmpegPromise: Promise<FFmpeg> = loadFFmpeg();
-
 // HTML要素の取得
-const fileInput = document.getElementById("fileInput") as HTMLInputElement;
+const fileInput = document.getElementById(
+  "fileInput"
+) as HTMLInputElement | null;
 const convertButton = document.getElementById(
   "convertButton"
-) as HTMLButtonElement;
+) as HTMLButtonElement | null;
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
-) as HTMLDivElement;
+) as HTMLDivElement | null;
 const statusMessage = document.getElementById(
   "statusMessage"
-) as HTMLParagraphElement; // 状態表示用の要素
-const logMessage = document.getElementById("logMessage") as HTMLPreElement; // FFmpegのログ表示用の要素
+) as HTMLParagraphElement | null; // 状態表示用の要素
+const logMessage = document.getElementById(
+  "logMessage"
+) as HTMLPreElement | null; // FFmpegのログ表示用の要素
 
 /**
  * ログをUIに表示する関数
  * @param message ログメッセージ
  */
 function logToUI(message: string) {
-  const timestamp = new Date().toLocaleTimeString();
-  logMessage.textContent += `[${timestamp}] ${message}\n`;
+  if (logMessage) {
+    const timestamp = new Date().toLocaleTimeString();
+    logMessage.textContent += `[${timestamp}] ${message}\n`;
+  } else {
+    console.error("logMessage 要素が見つかりません。");
+  }
 }
 
 // ファイルが選択された際の処理
-fileInput.addEventListener("change", () => {
-  if (fileInput.files?.length) {
-    convertButton.disabled = false;
+fileInput?.addEventListener("change", () => {
+  if (fileInput?.files?.length) {
+    if (convertButton) convertButton.disabled = false;
     logToUI("ファイルが選択されました。");
   }
 });
 
 // コンバートボタンが押された時の処理
-convertButton.addEventListener("click", async () => {
-  if (fileInput.files?.length) {
+convertButton?.addEventListener("click", async () => {
+  if (fileInput?.files?.length) {
     const file = fileInput.files[0];
     const url = URL.createObjectURL(file);
 
     try {
-      statusMessage.textContent = "コンバート中です..."; // 処理開始メッセージを表示
+      if (statusMessage) statusMessage.textContent = "コンバート中です..."; // 処理開始メッセージを表示
       logToUI("コンバートが開始されました...");
-      convertButton.disabled = true; // ボタンを無効化
+      if (convertButton) convertButton.disabled = true; // ボタンを無効化
 
       const ffmpeg = await ffmpegPromise; // FFmpegロード待ち
       logToUI("FFmpegが正常にロードされました。");
@@ -54,21 +61,26 @@ convertButton.addEventListener("click", async () => {
       const zipUrl = await extractMediaAndZip(ffmpeg, url);
 
       // ダウンロードリンクの作成
-      const link = document.createElement("a");
-      link.href = zipUrl;
-      link.download = "media.zip";
-      link.textContent = "ZIPファイルをダウンロード";
+      if (downloadLinkContainer) {
+        const link = document.createElement("a");
+        link.href = zipUrl;
+        link.download = "media.zip";
+        link.textContent = "ZIPファイルをダウンロード";
 
-      downloadLinkContainer.innerHTML = ""; // 前のリンクをクリア
-      downloadLinkContainer.appendChild(link);
-      statusMessage.textContent = "コンバートが完了しました！"; // 完了メッセージを表示
+        downloadLinkContainer.innerHTML = ""; // 前のリンクをクリア
+        downloadLinkContainer.appendChild(link);
+      }
+
+      if (statusMessage)
+        statusMessage.textContent = "コンバートが完了しました！"; // 完了メッセージを表示
       logToUI("コンバートが完了しました。");
     } catch (error) {
-      console.error("FFmpeg loading or execution failed", error);
       logToUI(`エラー: ${error}`);
-      statusMessage.textContent = "エラーが発生しました。再試行してください。"; // エラーメッセージを表示
+      if (statusMessage)
+        statusMessage.textContent =
+          "エラーが発生しました。再試行してください。"; // エラーメッセージを表示
     } finally {
-      convertButton.disabled = false; // ボタンを再び有効化
+      if (convertButton) convertButton.disabled = false; // ボタンを再び有効化
     }
   }
 });
@@ -183,18 +195,19 @@ async function loadFFmpeg(): Promise<FFmpeg> {
 
     // FFmpegの進捗表示
     ffmpeg.on("progress", ({ progress, time }) => {
-      statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
-        2
-      )}% - 時間: ${time}`;
+      if (statusMessage) {
+        statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
+          2
+        )}% - 時間: ${time}`;
+      }
       logToUI(`進行状況: ${(progress * 100).toFixed(2)}% - 時間: ${time}`);
     });
 
     logToUI("FFmpegが正常にロードされました。");
     return ffmpeg;
   } catch (error) {
-    console.error("FFmpegのロード中にエラーが発生しました:", error);
     logToUI(`FFmpegのロード中にエラーが発生しました: ${error}`);
-    throw error; // エラーを再スローして他の部分でもハンドリングできるようにする
+    throw error;
   }
 }
 
