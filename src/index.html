@@ -1,22 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MP4 to ZIP Converter</title>
+    <title>FFmpeg File Converter</title>
     <link rel="stylesheet" href="style.css" />
     <script src="coi-serviceworker.js"></script>
   </head>
   <body>
     <div class="container">
-      <h1>MP4 to ZIP Converter</h1>
-      <input type="file" id="fileInput" accept="video/mp4" />
-      <!-- 状態表示用の要素 -->
-      <p id="statusMessage"></p>
+      <h1>FFmpeg File Converter</h1>
 
-      <button id="convertButton" disabled>Convert to ZIP</button>
-      <div id="downloadLinkContainer"></div>
+      <div class="file-upload">
+        <label for="fileInput" class="file-label">ファイルを選択</label>
+        <input type="file" id="fileInput" class="file-input" />
+      </div>
+
+      <div class="status">
+        <p id="statusMessage">ファイルを選択してください。</p>
+      </div>
+
+      <button id="convertButton" class="convert-button" disabled>
+        コンバート開始
+      </button>
+
+      <div id="downloadLinkContainer" class="download-container"></div>
+
+      <div class="log-container">
+        <h2>ログ</h2>
+        <pre id="logMessage" class="log-message"></pre>
+      </div>
     </div>
+
     <script src="main.js"></script>
   </body>
 </html>
