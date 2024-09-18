@@ -1,94 +1,106 @@
-import { fetchFile } from "@ffmpeg/util";
-import { WorkerCommand, WorkerMessage } from "./core-mt/worker";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import JSZip from "jszip";
 
-const worker = new Worker("./core-mt/worker.js");
-
-function sendWorkerCommand<T = any>(
-  command: WorkerCommand,
-  args: any[] = []
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    worker.postMessage({ command, args } as WorkerMessage);
-    worker.onmessage = (event) => {
-      if (event.data.status === "error") {
-        reject(event.data.message);
-      } else if (event.data.status === "progress") {
-        const { percent, estimatedRemainingTime } = event.data;
-        progressBar.style.width = `${percent}%`;
-        timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;
-      } else {
-        resolve(event.data.result);
-      }
-    };
-  });
-}
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-const createPackButton = document.getElementById(
-  "createPackButton"
+const convertButton = document.getElementById(
+  "convertButton"
 ) as HTMLButtonElement;
-const progressBar = document.getElementById("progress") as HTMLDivElement;
-const timeRemainingDisplay = document.getElementById(
-  "timeRemaining"
-) as HTMLDivElement;
-const statusDisplay = document.getElementById("status") as HTMLDivElement;
+const downloadLinkContainer = document.getElementById("downloadLinkContainer");
 
-// FFmpegのロード処理
-async function loadFFmpeg() {
-  try {
-    statusDisplay.innerText = "Loading FFmpeg...";
-    await sendWorkerCommand("load");
-    statusDisplay.innerText = "FFmpeg loaded.";
-  } catch (error) {
-    statusDisplay.innerText = "Error loading FFmpeg.";
-    console.error("Error loading FFmpeg:", error);
-  }
-}
-
-// パック生成処理
-async function createBPandRP(file: File, frameCount: number, fps: number) {
-  statusDisplay.innerText = "Creating BP and RP...";
-
-  const inputFileData = new Uint8Array(await file.arrayBuffer());
-
-  await sendWorkerCommand("createPack", [inputFileData, frameCount, fps]);
-
-  const result = await sendWorkerCommand<Blob>("getPack");
-  const downloadLink = document.createElement("a");
-  downloadLink.href = URL.createObjectURL(result);
-  downloadLink.download = "generated_pack.mcaddon";
-  downloadLink.click();
-
-  statusDisplay.innerText = "Pack creation complete!";
-}
-
-// ボタンイベント
-createPackButton.addEventListener("click", async () => {
-  const file = fileInput.files?.[0];
-  if (!file) {
-    alert("Please select a video file.");
-    return;
-  }
-
-  const frameCount = parseInt(
-    (document.getElementById("frameCount") as HTMLInputElement).value
-  );
-  const fps = parseInt(
-    (document.getElementById("fps") as HTMLInputElement).value
-  );
-
-  try {
-    await createBPandRP(file, frameCount, fps);
-  } catch (error) {
-    statusDisplay.innerText = "Error during pack creation.";
-    console.error("Error during pack creation:", error);
+fileInput.addEventListener("change", () => {
+  if (fileInput.files?.length) {
+    convertButton.disabled = false;
   }
 });
 
-// 進捗バーや残り時間の更新
-function updateProgress(percent: number, estimatedRemainingTime: number) {
-  progressBar.style.width = `${percent}%`;
-  timeRemainingDisplay.innerText = `Estimated Time Left: ${estimatedRemainingTime}s`;
-}
+convertButton.addEventListener("click", async () => {
+  if (fileInput.files?.length) {
+    const file = fileInput.files[0];
+    const url = URL.createObjectURL(file);
+    const zipUrl = await extractMediaAndZip(url);
 
-// FFmpegのロード開始
-loadFFmpeg().catch(console.error);
+    const link = document.createElement("a");
+    link.href = zipUrl;
+    link.download = "media.zip";
+    link.textContent = "Download ZIP";
+
+    if (downloadLinkContainer == null) return;
+    downloadLinkContainer.innerHTML = ""; // Clear previous link
+    downloadLinkContainer.appendChild(link);
+  }
+});
+
+async function extractMediaAndZip(inputFile: string) {
+  const ffmpeg = new FFmpeg();
+  const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/esm";
+
+  // FFmpegの初期化
+  await ffmpeg.load({
+    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, "text/javascript"),
+    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, "application/wasm"),
+    workerURL: await toBlobURL(
+      `${baseURL}/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ),
+  });
+
+  console.warn("ffmpeg loaded");
+
+  // MP4ファイルをFFmpegに読み込み
+  await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
+  console.warn("input.mp4 written");
+
+  // 映像をフレームごとに番号付きの画像（PNG）として抽出
+  await ffmpeg.exec([
+    "-i",
+    "input.mp4",
+    "-vf",
+    "fps=1", // 1フレーム毎秒で抽出
+    "-q:v",
+    "3",
+    "output_%03d.png",
+  ]);
+  console.warn("output images written");
+
+  // 音声をOGG形式で抽出
+  await ffmpeg.exec([
+    "-i",
+    "input.mp4",
+    "-q:a",
+    "0",
+    "-map",
+    "a",
+    "output.ogg",
+  ]);
+  console.warn("output.ogg written");
+
+  // 出力ファイルを読み込む
+  const audioData = await ffmpeg.readFile("output.ogg");
+
+  // 生成された画像の読み込み
+  const zip = new JSZip();
+  let i = 1;
+  while (true) {
+    try {
+      const imageData = await ffmpeg.readFile(
+        `output_${String(i).padStart(3, "0")}.png`
+      );
+      zip.file(`image_${i}.png`, imageData);
+      i++;
+    } catch (e) {
+      break;
+    }
+  }
+
+  console.warn("Images and audio extracted");
+
+  // ZIPファイルに音声を追加
+  zip.file("output.ogg", audioData);
+
+  // ZIPファイルを生成してBlobに変換
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  const zipURL = URL.createObjectURL(zipBlob);
+
+  return zipURL;
+}

@@ -3,34 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Minecraft BP/RP Generator</title>
+    <title>MP4 to ZIP Converter</title>
     <link rel="stylesheet" href="style.css" />
     <script src="coi-serviceworker.js"></script>
   </head>
   <body>
     <div class="container">
-      <h1>Minecraft BP/RP Generator</h1>
-      <p>Select a video to generate Minecraft BP and RP packs.</p>
-
-      <label for="fileInput">Select Video File:</label>
-      <input type="file" id="fileInput" accept="video/*" />
-
-      <label for="frameCount">Frame Count:</label>
-      <input type="number" id="frameCount" value="200" min="1" />
-
-      <label for="fps">Frame Rate (Max 20):</label>
-      <input type="number" id="fps" value="20" min="1" max="20" />
-
-      <button id="createPackButton">Create BP/RP Packs</button>
-
-      <div id="progressContainer">
-        <div id="progress"></div>
-      </div>
-
-      <div id="timeRemaining"></div>
-      <div id="status"></div>
+      <h1>MP4 to ZIP Converter</h1>
+      <input type="file" id="fileInput" accept="video/mp4" />
+      <button id="convertButton" disabled>Convert to ZIP</button>
+      <div id="downloadLinkContainer"></div>
     </div>
-
     <script src="main.js"></script>
   </body>
 </html>

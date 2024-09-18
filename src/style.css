@@ -1,71 +1,45 @@
 body {
   font-family: Arial, sans-serif;
-  background-color: #f9f9f9;
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
   margin: 0;
-  padding: 0;
 }
 
 .container {
-  max-width: 600px;
-  margin: 50px auto;
+  background-color: white;
   padding: 20px;
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
 
 h1 {
-  text-align: center;
+  font-size: 24px;
+  margin-bottom: 20px;
 }
 
-label {
-  display: block;
-  margin-top: 15px;
-}
-
-input[type="file"],
-input[type="number"] {
-  width: 100%;
-  padding: 8px;
-  margin-top: 5px;
-  margin-bottom: 15px;
+input[type="file"] {
+  margin-bottom: 20px;
 }
 
 button {
-  width: 100%;
-  padding: 12px;
   background-color: #4caf50;
   color: white;
   border: none;
-  border-radius: 5px;
+  padding: 10px 20px;
+  border-radius: 4px;
   cursor: pointer;
+  font-size: 16px;
 }
 
-button:hover {
-  background-color: #45a049;
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
-#progressContainer {
-  width: 100%;
-  background-color: #ddd;
-  height: 30px;
-  border-radius: 5px;
-  margin-top: 20px;
-}
-
-#progress {
-  width: 0;
-  height: 100%;
-  background-color: #4caf50;
-  border-radius: 5px;
-}
-
-#timeRemaining {
-  text-align: center;
-  margin-top: 10px;
-}
-
-#status {
-  text-align: center;
+#downloadLinkContainer {
   margin-top: 20px;
 }
