@@ -12,6 +12,9 @@ const convertButton = document.getElementById(
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
+const statusMessage = document.getElementById(
+  "statusMessage"
+) as HTMLParagraphElement; // 状態表示用の要素
 
 fileInput.addEventListener("change", () => {
   if (fileInput.files?.length) {
@@ -25,18 +28,24 @@ convertButton.addEventListener("click", async () => {
     const url = URL.createObjectURL(file);
 
     try {
+      statusMessage.textContent = "コンバート中です..."; // 処理開始メッセージを表示
+      convertButton.disabled = true; // ボタンを無効化
       const ffmpeg = await ffmpegPromise; // FFmpegロード待ち
       const zipUrl = await extractMediaAndZip(ffmpeg, url);
 
       const link = document.createElement("a");
       link.href = zipUrl;
       link.download = "media.zip";
-      link.textContent = "Download ZIP";
+      link.textContent = "ZIPファイルをダウンロード";
 
       downloadLinkContainer.innerHTML = ""; // 前のリンクをクリア
       downloadLinkContainer.appendChild(link);
+      statusMessage.textContent = "コンバートが完了しました！"; // 完了メッセージを表示
     } catch (error) {
       console.error("FFmpeg loading or execution failed", error);
+      statusMessage.textContent = "エラーが発生しました。再試行してください。"; // エラーメッセージを表示
+    } finally {
+      convertButton.disabled = false; // ボタンを再び有効化
     }
   }
 });
@@ -144,8 +153,13 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
   return ffmpeg;
 }
 
+/**
+ * stringからUint8Arrayに変換する関数
+ * @param data Base64などでエンコードされたデータ
+ * @returns Uint8Arrayに変換されたデータ
+ */
 function stringToUint8Array(data: string): Uint8Array {
-  const binaryString = atob(data); // Base64エンコードされた文字列をデコード
+  const binaryString = atob(data); // Base64でエンコードされている場合のデコード
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
