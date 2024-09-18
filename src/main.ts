@@ -82,11 +82,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     inputFile: string
   ): Promise<string> {
     logToUI("MP4ファイルをFFmpegに読み込み中...");
-    await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
+    ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
     logToUI("input.mp4が書き込まれました。");
 
     // 映像をフレームごとに番号付きの画像（PNG）として抽出
-    await ffmpeg.exec([
+    ffmpeg.exec([
       "-i",
       "input.mp4",
       "-vf",
