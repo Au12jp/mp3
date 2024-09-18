@@ -5,6 +5,14 @@ import JSZip from "jszip";
 
 // メインの処理をDOMContentLoadedイベント内で実行
 document.addEventListener("DOMContentLoaded", () => {
+  const logMessage = document.getElementById(
+    "logMessage"
+  ) as HTMLPreElement | null;
+  console.log("logMessage要素:", logMessage); // ここで要素が取得できているか確認する
+
+  if (!logMessage) {
+    console.error("logMessageが見つかりません。");
+  }
   // HTML要素の取得
   const fileInput = document.getElementById(
     "fileInput"
@@ -18,9 +26,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusMessage = document.getElementById(
     "statusMessage"
   ) as HTMLParagraphElement | null;
-  const logMessage = document.getElementById(
-    "logMessage"
-  ) as HTMLPreElement | null;
 
   const ffmpegPromise: Promise<FFmpeg> = loadFFmpeg();
 
