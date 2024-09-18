@@ -131,21 +131,8 @@ async function extractMediaAndZip(
  */
 export async function loadFFmpeg(): Promise<FFmpeg> {
   const ffmpeg = new FFmpeg();
-  const CORE_VERSION = "0.12.6"; // 使用するバージョンを指定
+  const CORE_VERSION = "0.12.1";
 
-  // FFmpegのログ表示
-  ffmpeg.on("log", ({ type, message }) => {
-    logMessage.textContent += `[${type}] ${message}\n`; // ログを追加
-  });
-
-  // FFmpegの進捗表示
-  ffmpeg.on("progress", ({ progress, time }) => {
-    statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
-      2
-    )}% - 時間: ${time}`;
-  });
-
-  // FFmpegの初期化
   await ffmpeg.load({
     coreURL: await toBlobURL(
       `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
@@ -159,7 +146,19 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
       `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
       "text/javascript"
     ),
-    classWorkerURL: await toBlobURL("./worker.js", "text/javascript"), // worker.ts からコンパイルされたworker.jsを使用
+    classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
+  });
+
+  // FFmpegのログ表示
+  ffmpeg.on("log", ({ type, message }) => {
+    logMessage.textContent += `[${type}] ${message}\n`; // ログを追加
+  });
+
+  // FFmpegの進捗表示
+  ffmpeg.on("progress", ({ progress, time }) => {
+    statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
+      2
+    )}% - 時間: ${time}`;
   });
 
   console.log("FFmpeg core loaded successfully");
