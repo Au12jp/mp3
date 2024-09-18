@@ -3,8 +3,10 @@ import { FileData } from "@ffmpeg/ffmpeg/dist/esm/types";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import JSZip from "jszip";
 
+// FFmpegの初期化とロードを行うPromise
 const ffmpegPromise: Promise<FFmpeg> = loadFFmpeg();
 
+// HTML要素の取得
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
@@ -17,12 +19,24 @@ const statusMessage = document.getElementById(
 ) as HTMLParagraphElement; // 状態表示用の要素
 const logMessage = document.getElementById("logMessage") as HTMLPreElement; // FFmpegのログ表示用の要素
 
+/**
+ * ログをUIに表示する関数
+ * @param message ログメッセージ
+ */
+function logToUI(message: string) {
+  const timestamp = new Date().toLocaleTimeString();
+  logMessage.textContent += `[${timestamp}] ${message}\n`;
+}
+
+// ファイルが選択された際の処理
 fileInput.addEventListener("change", () => {
   if (fileInput.files?.length) {
     convertButton.disabled = false;
+    logToUI("ファイルが選択されました。");
   }
 });
 
+// コンバートボタンが押された時の処理
 convertButton.addEventListener("click", async () => {
   if (fileInput.files?.length) {
     const file = fileInput.files[0];
@@ -30,10 +44,16 @@ convertButton.addEventListener("click", async () => {
 
     try {
       statusMessage.textContent = "コンバート中です..."; // 処理開始メッセージを表示
+      logToUI("コンバートが開始されました...");
       convertButton.disabled = true; // ボタンを無効化
+
       const ffmpeg = await ffmpegPromise; // FFmpegロード待ち
+      logToUI("FFmpegが正常にロードされました。");
+
+      // メディアの処理とZIP作成
       const zipUrl = await extractMediaAndZip(ffmpeg, url);
 
+      // ダウンロードリンクの作成
       const link = document.createElement("a");
       link.href = zipUrl;
       link.download = "media.zip";
@@ -42,8 +62,10 @@ convertButton.addEventListener("click", async () => {
       downloadLinkContainer.innerHTML = ""; // 前のリンクをクリア
       downloadLinkContainer.appendChild(link);
       statusMessage.textContent = "コンバートが完了しました！"; // 完了メッセージを表示
+      logToUI("コンバートが完了しました。");
     } catch (error) {
       console.error("FFmpeg loading or execution failed", error);
+      logToUI(`エラー: ${error}`);
       statusMessage.textContent = "エラーが発生しました。再試行してください。"; // エラーメッセージを表示
     } finally {
       convertButton.disabled = false; // ボタンを再び有効化
@@ -61,9 +83,9 @@ async function extractMediaAndZip(
   ffmpeg: FFmpeg,
   inputFile: string
 ): Promise<string> {
-  // MP4ファイルをFFmpegに読み込み
+  logToUI("MP4ファイルをFFmpegに読み込み中...");
   await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
-  console.warn("input.mp4 written");
+  logToUI("input.mp4が書き込まれました。");
 
   // 映像をフレームごとに番号付きの画像（PNG）として抽出
   await ffmpeg.exec([
@@ -75,7 +97,7 @@ async function extractMediaAndZip(
     "3",
     "output_%03d.png",
   ]);
-  console.warn("output images written");
+  logToUI("画像がフレームごとに抽出されました。");
 
   // 音声をOGG形式で抽出
   await ffmpeg.exec([
@@ -87,7 +109,7 @@ async function extractMediaAndZip(
     "a",
     "output.ogg",
   ]);
-  console.warn("output.ogg written");
+  logToUI("音声がOGG形式で抽出されました。");
 
   // 出力ファイルを読み込む
   let audioData: FileData = await ffmpeg.readFile("output.ogg");
@@ -113,7 +135,7 @@ async function extractMediaAndZip(
     }
   }
 
-  console.warn("Images and audio extracted");
+  logToUI("画像と音声の抽出が完了しました。");
 
   // ZIPファイルに音声を追加
   zip.file("output.ogg", audioData as Uint8Array); // 型キャスト
@@ -121,6 +143,8 @@ async function extractMediaAndZip(
   // ZIPファイルを生成してBlobに変換
   const zipBlob: Blob = await zip.generateAsync({ type: "blob" });
   const zipURL: string = URL.createObjectURL(zipBlob);
+
+  logToUI("ZIPファイルが生成されました。");
 
   return zipURL;
 }
@@ -134,6 +158,7 @@ async function loadFFmpeg(): Promise<FFmpeg> {
     const ffmpeg = new FFmpeg();
     const CORE_VERSION = "0.12.6";
 
+    logToUI("FFmpegをロード中...");
     // FFmpegコアのロード
     await ffmpeg.load({
       coreURL: await toBlobURL(
@@ -153,7 +178,7 @@ async function loadFFmpeg(): Promise<FFmpeg> {
 
     // FFmpegのログ表示
     ffmpeg.on("log", ({ type, message }) => {
-      logMessage.textContent += `[${type}] ${message}\n`; // ログを追加
+      logToUI(`[${type}] ${message}`);
     });
 
     // FFmpegの進捗表示
@@ -161,12 +186,14 @@ async function loadFFmpeg(): Promise<FFmpeg> {
       statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
         2
       )}% - 時間: ${time}`;
+      logToUI(`進行状況: ${(progress * 100).toFixed(2)}% - 時間: ${time}`);
     });
 
-    console.log("FFmpeg core loaded successfully");
+    logToUI("FFmpegが正常にロードされました。");
     return ffmpeg;
   } catch (error) {
     console.error("FFmpegのロード中にエラーが発生しました:", error);
+    logToUI(`FFmpegのロード中にエラーが発生しました: ${error}`);
     throw error; // エラーを再スローして他の部分でもハンドリングできるようにする
   }
 }
