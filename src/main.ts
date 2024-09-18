@@ -82,11 +82,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     inputFile: string
   ): Promise<string> {
     logToUI("MP4ファイルをFFmpegに読み込み中...");
-    ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
+    await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
     logToUI("input.mp4が書き込まれました。");
 
     // 映像をフレームごとに番号付きの画像（PNG）として抽出
-    ffmpeg.exec([
+    await ffmpeg.exec([
       "-i",
       "input.mp4",
       "-vf",
@@ -98,12 +98,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     logToUI("画像がフレームごとに抽出されました。");
 
     // 音声をOGG形式で抽出
-    ffmpeg.exec(["-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg"]);
+    await ffmpeg.exec([
+      "-i",
+      "input.mp4",
+      "-q:a",
+      "0",
+      "-map",
+      "a",
+      "output.ogg",
+    ]);
     logToUI("音声がOGG形式で抽出されました。");
 
     // 出力ファイルを読み込む
     //@ts-ignore
-    let audioData: FileData = ffmpeg.readFile("output.ogg");
+    let audioData: FileData = await ffmpeg.readFile("output.ogg");
     if (typeof audioData === "string") {
       audioData = stringToUint8Array(audioData); // stringからUint8Arrayに変換
     }
@@ -114,7 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     while (true) {
       try {
         //@ts-ignore
-        let imageData: FileData = ffmpeg.readFile(
+        let imageData: FileData = await ffmpeg.readFile(
           `output_${String(i).padStart(3, "0")}.png`
         );
         if (typeof imageData === "string") {
@@ -165,11 +173,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // ログイベントの設定
     ffmpeg.on("log", ({ type, message }) => {
+      console.log(`[FFmpeg Log] ${type}: ${message}`); // コンソールに直接出力
       logToUI(`[${type}] ${message}`);
     });
 
     // 進捗イベントの設定
     ffmpeg.on("progress", ({ progress, time }) => {
+      console.log(
+        `[FFmpeg Progress] Progress: ${progress * 100}% - Time: ${time}`
+      ); // コンソールに直接出力
       if (statusMessage) {
         statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
           2
