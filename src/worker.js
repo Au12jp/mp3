@@ -1,2 +1,2 @@
-"use strict";(()=>{self.addEventListener("message",e=>{console.log("Worker received a message:",e.data),self.postMessage({type:"log",message:"Worker is running."})});})();
+"use strict";(()=>{self.addEventListener("message",e=>{switch(console.log("Worker received a message:",e.data),e.data.type){case"LOAD":console.log("FFmpeg\u306E\u30ED\u30FC\u30C9\u8981\u6C42\u3092\u53D7\u4FE1\u3057\u307E\u3057\u305F\u3002");break;case"EXEC":console.log("FFmpeg\u30B3\u30DE\u30F3\u30C9\u3092\u5B9F\u884C\u3059\u308B\u305F\u3081\u306E\u8981\u6C42\u3092\u53D7\u4FE1\u3057\u307E\u3057\u305F\u3002");break;default:console.warn("\u4E0D\u660E\u306A\u30E1\u30C3\u30BB\u30FC\u30B8\u30BF\u30A4\u30D7\u3092\u53D7\u4FE1:",e.data.type)}});})();
 //# sourceMappingURL=worker.js.map

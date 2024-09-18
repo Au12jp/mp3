@@ -129,40 +129,46 @@ async function extractMediaAndZip(
  * FFmpegをロードし、初期化する関数
  * @returns FFmpegインスタンス
  */
-export async function loadFFmpeg(): Promise<FFmpeg> {
-  const ffmpeg = new FFmpeg();
-  const CORE_VERSION = "0.12.6";
+async function loadFFmpeg(): Promise<FFmpeg> {
+  try {
+    const ffmpeg = new FFmpeg();
+    const CORE_VERSION = "0.12.6";
 
-  await ffmpeg.load({
-    coreURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
-      "text/javascript"
-    ),
-    wasmURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
-      "application/wasm"
-    ),
-    workerURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
-      "text/javascript"
-    ),
-    classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
-  });
+    // FFmpegコアのロード
+    await ffmpeg.load({
+      coreURL: await toBlobURL(
+        `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
+        "text/javascript"
+      ),
+      wasmURL: await toBlobURL(
+        `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
+        "application/wasm"
+      ),
+      workerURL: await toBlobURL(
+        `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
+        "text/javascript"
+      ),
+      classWorkerURL: await toBlobURL("./worker.js", "text/javascript"),
+    });
 
-  // FFmpegのログ表示
-  ffmpeg.on("log", ({ type, message }) => {
-    logMessage.textContent += `[${type}] ${message}\n`; // ログを追加
-  });
+    // FFmpegのログ表示
+    ffmpeg.on("log", ({ type, message }) => {
+      logMessage.textContent += `[${type}] ${message}\n`; // ログを追加
+    });
 
-  // FFmpegの進捗表示
-  ffmpeg.on("progress", ({ progress, time }) => {
-    statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
-      2
-    )}% - 時間: ${time}`;
-  });
+    // FFmpegの進捗表示
+    ffmpeg.on("progress", ({ progress, time }) => {
+      statusMessage.textContent = `進行状況: ${(progress * 100).toFixed(
+        2
+      )}% - 時間: ${time}`;
+    });
 
-  console.log("FFmpeg core loaded successfully");
-  return ffmpeg;
+    console.log("FFmpeg core loaded successfully");
+    return ffmpeg;
+  } catch (error) {
+    console.error("FFmpegのロード中にエラーが発生しました:", error);
+    throw error; // エラーを再スローして他の部分でもハンドリングできるようにする
+  }
 }
 
 /**
