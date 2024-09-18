@@ -173,7 +173,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     logToUI("configが正常にロードされました。");
 
-    await ffmpeg.load(config);
+    ffmpeg.load(config);
 
     logToUI("FFmpegが正常にロードされました。");
 
