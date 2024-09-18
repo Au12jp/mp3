@@ -48,7 +48,7 @@ async function extractMediaAndZip(inputFile: string) {
       `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
       "text/javascript"
     ),
-    classWorkerURL: "./worker.js", // worker.ts からコンパイルされたworker.jsを使用
+    classWorkerURL: await toBlobURL("./worker.js", "text/javascript"), // worker.ts からコンパイルされたworker.jsを使用
   });
 
   console.warn("ffmpeg loaded");
