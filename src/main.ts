@@ -2,6 +2,8 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import JSZip from "jszip";
 
+const ffmpeg = loadFFmpeg(); // FFmpegをロードする専用関数を呼び出し
+
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
@@ -18,41 +20,33 @@ convertButton.addEventListener("click", async () => {
   if (fileInput.files?.length) {
     const file = fileInput.files[0];
     const url = URL.createObjectURL(file);
-    const zipUrl = await extractMediaAndZip(url);
 
-    const link = document.createElement("a");
-    link.href = zipUrl;
-    link.download = "media.zip";
-    link.textContent = "Download ZIP";
+    try {
+      const zipUrl = await extractMediaAndZip(ffmpeg, url);
 
-    if (downloadLinkContainer == null) return;
-    downloadLinkContainer.innerHTML = ""; // Clear previous link
-    downloadLinkContainer.appendChild(link);
+      const link = document.createElement("a");
+      link.href = zipUrl;
+      link.download = "media.zip";
+      link.textContent = "Download ZIP";
+
+      downloadLinkContainer!.innerHTML = ""; // Clear previous link
+      downloadLinkContainer!.appendChild(link);
+    } catch (error) {
+      console.error("FFmpeg loading failed", error);
+    }
   }
 });
 
-async function extractMediaAndZip(inputFile: string) {
-  const ffmpeg = new FFmpeg();
-  const CORE_VERSION = "0.12.6"; // 使用するバージョンを指定
-
-  await ffmpeg.load({
-    coreURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
-      "text/javascript"
-    ),
-    wasmURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
-      "application/wasm"
-    ),
-    workerURL: await toBlobURL(
-      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
-      "text/javascript"
-    ),
-    classWorkerURL: await toBlobURL("./worker.js", "text/javascript"), // worker.ts からコンパイルされたworker.jsを使用
-  });
-
-  console.warn("ffmpeg loaded");
-
+/**
+ * FFmpegを使用してメディアを処理し、ZIPファイルを作成する関数
+ * @param ffmpeg FFmpegインスタンス
+ * @param inputFile 処理対象のMP4ファイルのURL
+ * @returns ZIPファイルのURL
+ */
+async function extractMediaAndZip(
+  ffmpeg: any,
+  inputFile: string
+): Promise<string> {
   // MP4ファイルをFFmpegに読み込み
   await ffmpeg.writeFile("input.mp4", await fetchFile(inputFile));
   console.warn("input.mp4 written");
@@ -65,7 +59,7 @@ async function extractMediaAndZip(inputFile: string) {
     "fps=1", // 1フレーム毎秒で抽出
     "-q:v",
     "3",
-    "output_%d.png",
+    "output_%03d.png",
   ]);
   console.warn("output images written");
 
@@ -109,4 +103,33 @@ async function extractMediaAndZip(inputFile: string) {
   const zipURL = URL.createObjectURL(zipBlob);
 
   return zipURL;
+}
+
+/**
+ * FFmpegをロードし、初期化する関数
+ * @returns FFmpegインスタンス
+ */
+export async function loadFFmpeg(): Promise<FFmpeg> {
+  const ffmpeg = new FFmpeg();
+  const CORE_VERSION = "0.12.6"; // 使用するバージョンを指定
+
+  // FFmpegの初期化
+  await ffmpeg.load({
+    coreURL: await toBlobURL(
+      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.js`,
+      "text/javascript"
+    ),
+    wasmURL: await toBlobURL(
+      `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd/ffmpeg-core.wasm`,
+      "application/wasm"
+    ),
+    workerURL: await toBlobURL(
+      `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd/ffmpeg-core.worker.js`,
+      "text/javascript"
+    ),
+    classWorkerURL: await toBlobURL("./worker.js", "text/javascript"), // worker.ts からコンパイルされたworker.jsを使用
+  });
+
+  console.log("FFmpeg core loaded successfully");
+  return ffmpeg;
 }
