@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       "-i",
       "input.mp4",
       "-vf",
-      "fps=1",
+      "fps=20",
       "-q:v",
       "3",
       "output_%03d.png",
