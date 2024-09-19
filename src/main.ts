@@ -8,10 +8,21 @@ const ffmpeg = createFFmpeg({
   log: true,
 });
 
+let isCancelled = false;
+
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
 ) as HTMLButtonElement;
+const cancelButton = document.getElementById(
+  "cancelButton"
+) as HTMLButtonElement;
+const formatSelectAudio = document.getElementById(
+  "formatSelectAudio"
+) as HTMLSelectElement;
+const formatSelectVideo = document.getElementById(
+  "formatSelectVideo"
+) as HTMLSelectElement;
 const statusMessage = document.getElementById(
   "statusMessage"
 ) as HTMLParagraphElement;
@@ -25,6 +36,7 @@ const logMessage = document.getElementById("logMessage") as HTMLPreElement;
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
+const modal = document.getElementById("completeModal") as HTMLDivElement;
 
 let totalFileSize: number;
 
@@ -45,15 +57,17 @@ window.addEventListener("load", () => {
 // ファイル選択時のイベントリスナー
 fileInput.addEventListener("change", async () => {
   if (fileInput.files?.length) {
-    const file = fileInput.files[0];
-    totalFileSize = file.size; // ファイルサイズを取得
-    statusMessage.textContent = `ファイルが選択されました: ${Math.round(
-      totalFileSize / 1024 / 1024
-    )} MB`;
+    const files = fileInput.files;
+    totalFileSize = Array.from(files).reduce((sum, file) => sum + file.size, 0);
+    statusMessage.textContent = `ファイルが選択されました (${
+      files.length
+    } ファイル, 合計: ${Math.round(totalFileSize / 1024 / 1024)} MB)`;
     convertButton.disabled = false;
+    cancelButton.disabled = false;
   }
 });
 
+// FFmpegのログから進捗を解析する関数
 const parseProgress = (log: string) => {
   const timeRegex = /time=(\d+:\d+:\d+\.\d+)/;
   const match = timeRegex.exec(log);
@@ -78,22 +92,58 @@ ffmpeg.setLogger(({ type, message }) => {
   }
 });
 
+// キャンセルボタンの動作
+cancelButton.addEventListener("click", () => {
+  isCancelled = true;
+  statusMessage.textContent = "変換がキャンセルされました。";
+  convertButton.disabled = false;
+  cancelButton.disabled = true;
+});
+
+// 処理完了時にモーダルを表示
+const showCompleteModal = () => {
+  modal.style.display = "block";
+};
+
+// モーダルを閉じる処理
+modal.addEventListener("click", () => {
+  modal.style.display = "none";
+});
+
 // ファイル変換処理
-const processFile = async (file: File) => {
+const processFile = async (
+  file: File,
+  audioFormat: string,
+  videoFormat: string
+) => {
   const fileName = file.name.split(".")[0];
 
   // 入力ファイルをFFmpegに書き込む
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  logMessage.textContent += "音声と映像の抽出を開始しています...\n";
+  logMessage.textContent += `音声を${audioFormat}形式で抽出しています...\n`;
+  if (isCancelled) return;
 
-  // 1. 音声の抽出（ogg形式）
-  logMessage.textContent += "音声をogg形式で抽出しています...\n";
-  await ffmpeg.run("-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg");
+  await ffmpeg.run(
+    "-i",
+    "input.mp4",
+    "-q:a",
+    "0",
+    "-map",
+    "a",
+    `output.${audioFormat}`
+  );
 
-  // 2. 映像の抽出 (20fpsでpng画像として出力)
-  logMessage.textContent += "映像を20fpsでpng形式で抽出しています...\n";
-  await ffmpeg.run("-i", "input.mp4", "-vf", "fps=20", "output_%03d.png");
+  logMessage.textContent += `映像を20fpsで${videoFormat}形式で抽出しています...\n`;
+  if (isCancelled) return;
+
+  await ffmpeg.run(
+    "-i",
+    "input.mp4",
+    "-vf",
+    "fps=20",
+    `output_%03d.${videoFormat}`
+  );
 
   logMessage.textContent += "変換が完了しました。\n";
 
@@ -101,19 +151,19 @@ const processFile = async (file: File) => {
   const zip = new JSZip();
 
   // 音声ファイルをZIPに追加
-  const audioData = ffmpeg.FS("readFile", "output.ogg");
-  zip.file("audio.ogg", audioData);
+  const audioData = ffmpeg.FS("readFile", `output.${audioFormat}`);
+  zip.file(`audio.${audioFormat}`, audioData);
 
   // PNGファイルをまとめて追加
   let index = 1;
   while (true) {
-    const fileName = `output_${String(index).padStart(3, "0")}.png`;
+    const fileName = `output_${String(index).padStart(3, "0")}.${videoFormat}`;
     try {
       const imageData = ffmpeg.FS("readFile", fileName);
       zip.file(fileName, imageData);
       index++;
     } catch (error) {
-      break; // すべてのフレームを読み終わった場合に抜ける
+      break;
     }
   }
 
@@ -124,23 +174,33 @@ const processFile = async (file: File) => {
   downloadLink.textContent = "Download ZIPファイル";
   downloadLink.classList.add("download-link");
 
-  // ダウンロードリンクを表示
-  downloadLinkContainer.innerHTML = ""; // リセット
+  downloadLinkContainer.innerHTML = "";
   downloadLinkContainer.appendChild(downloadLink);
 
   statusMessage.textContent = "変換が完了しました。";
-  convertButton.disabled = false; // ボタンを再度有効化
+  convertButton.disabled = false;
+  cancelButton.disabled = true;
+
+  // 処理完了後の通知
+  showCompleteModal();
 };
 
 // コンバートボタン押下時のイベントリスナー
 convertButton.addEventListener("click", async () => {
   if (!fileInput.files?.length) return;
 
-  convertButton.disabled = true; // ボタンを無効化
+  const audioFormat = formatSelectAudio.value;
+  const videoFormat = formatSelectVideo.value;
+
+  convertButton.disabled = true;
   statusMessage.textContent = "変換中...";
 
-  const file = fileInput.files[0];
+  const files = fileInput.files;
+  isCancelled = false;
 
-  // ファイルの処理を実行
-  await processFile(file);
+  // 複数ファイルを順次処理
+  for (let i = 0; i < files.length; i++) {
+    await processFile(files[i], audioFormat, videoFormat);
+    if (isCancelled) break;
+  }
 });
