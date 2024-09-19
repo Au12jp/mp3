@@ -9,6 +9,7 @@ const ffmpeg = createFFmpeg({
 });
 
 let isCancelled = false;
+let totalDuration = 0;
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
@@ -67,27 +68,49 @@ fileInput.addEventListener("change", async () => {
   }
 });
 
-// FFmpegのログから進捗を解析する関数
+// FFmpegのログから進捗を解析するための関数
+const parseDuration = (log: string) => {
+  const durationRegex = /Duration: (\d+):(\d+):(\d+\.\d+)/;
+  const match = durationRegex.exec(log);
+
+  if (match) {
+    const hours = parseFloat(match[1]);
+    const minutes = parseFloat(match[2]);
+    const seconds = parseFloat(match[3]);
+    totalDuration = hours * 3600 + minutes * 60 + seconds;
+  }
+};
+
 const parseProgress = (log: string) => {
-  const timeRegex = /time=(\d+:\d+:\d+\.\d+)/;
+  const timeRegex = /time=(\d+):(\d+):(\d+\.\d+)/;
   const match = timeRegex.exec(log);
 
-  if (match && match[1]) {
-    const timeParts = match[1].split(":").map(Number);
-    const seconds = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
-    return seconds;
+  if (match) {
+    const hours = parseFloat(match[1]);
+    const minutes = parseFloat(match[2]);
+    const seconds = parseFloat(match[3]);
+    const currentTime = hours * 3600 + minutes * 60 + seconds;
+
+    // 進捗を計算して進捗バーを更新
+    if (totalDuration > 0) {
+      const progress = (currentTime / totalDuration) * 100;
+      progressBar.value = progress;
+      progressPercent.textContent = `進捗: ${progress.toFixed(2)}%`;
+    }
   }
-  return null;
 };
 
 // FFmpegのログを処理して進捗を表示
 ffmpeg.setLogger(({ type, message }) => {
   if (type === "fferr") {
-    const timeInSeconds = parseProgress(message);
-    if (timeInSeconds) {
-      const progress = Math.min((timeInSeconds / 60) * 100, 100); // 例: 60秒動画として
-      progressBar.value = progress;
-      progressPercent.textContent = `進捗: ${progress.toFixed(2)}%`;
+    // 初めにdurationを取得
+    if (message.includes("Duration:")) {
+      parseDuration(message);
+    }
+
+    // timeの進捗を取得
+    if (message.includes("time=")) {
+      parseProgress(message);
     }
   }
 });
