@@ -6,6 +6,7 @@
     <title>FFmpeg File Converter</title>
     <link rel="stylesheet" href="style.css" />
     <script src="coi-serviceworker.js"></script>
+    <script src="main.js" defer></script>
   </head>
   <body>
     <div class="container">
@@ -14,11 +15,22 @@
       <!-- ファイル選択 -->
       <div class="file-upload">
         <label for="fileInput" class="file-label">ファイルを選択</label>
-        <input type="file" id="fileInput" class="file-input" multiple />
+        <input
+          type="file"
+          id="fileInput"
+          class="file-input"
+          accept="video/mp4"
+        />
+      </div>
+
+      <!-- 動画メタデータ（解像度やFPS） -->
+      <div class="video-info" id="videoInfo" style="display: none">
+        <p>解像度: <span id="videoResolution"></span></p>
+        <p>FPS: <span id="videoFPS"></span></p>
       </div>
 
       <!-- フォーマット選択 -->
-      <div class="format-selection">
+      <div class="format-selection" id="formatSelection" style="display: none">
         <label for="formatSelectAudio">音声フォーマット:</label>
         <select id="formatSelectAudio">
           <option value="ogg">OGG</option>
@@ -33,31 +45,32 @@
       </div>
 
       <!-- 解像度とFPS設定 -->
-      <div class="video-settings">
+      <div class="video-settings" id="videoSettings" style="display: none">
         <label for="resolutionSelect">解像度:</label>
         <select id="resolutionSelect">
-          <option value="1920x1080">1920x1080 (HD)</option>
-          <option value="1280x720">1280x720</option>
-          <option value="640x480">640x480</option>
+          <option value="1920x1080">1080p (Full HD)</option>
+          <option value="1280x720">720p (HD)</option>
+          <option value="640x360">360p (SD)</option>
+          <option value="256x144">144p</option>
         </select>
 
         <label for="fpsInput">FPS:</label>
-        <input type="number" id="fpsInput" value="20" min="1" max="20" />
+        <input type="number" id="fpsInput" min="1" max="20" />
       </div>
 
       <!-- 状態表示 -->
-      <div class="status">
+      <div class="status" id="statusContainer" style="display: none">
         <p id="statusMessage">ファイルを選択してください。</p>
         <p id="progressPercent">進捗: 0%</p>
       </div>
 
       <!-- 進捗バー -->
-      <div class="progress-bar">
+      <div class="progress-bar" id="progressContainer" style="display: none">
         <progress id="progressBar" value="0" max="100"></progress>
       </div>
 
       <!-- ボタン -->
-      <div class="button-group">
+      <div class="button-group" id="convertButtonGroup" style="display: none">
         <button id="convertButton" class="convert-button" disabled>
           コンバート開始
         </button>
@@ -80,6 +93,5 @@
         </div>
       </div>
     </div>
-    <script src="main.js" defer></script>
   </body>
 </html>

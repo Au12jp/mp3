@@ -4,11 +4,15 @@ import JSZip from "jszip";
 // FFmpegの初期化
 const ffmpeg = createFFmpeg({
   corePath:
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js",
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
   log: true,
 });
 
 let totalDuration = 0;
+let videoMetadata = {
+  resolution: "",
+  fps: 0,
+};
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
@@ -55,16 +59,46 @@ window.addEventListener("load", () => {
   loadFFmpeg();
 });
 
-// ファイル選択時のイベントリスナー
 fileInput.addEventListener("change", async () => {
-  if (fileInput.files?.length) {
-    const files = fileInput.files;
-    totalFileSize = Array.from(files).reduce((sum, file) => sum + file.size, 0);
-    statusMessage.textContent = `ファイルが選択されました (${
-      files.length
-    } ファイル, 合計: ${Math.round(totalFileSize / 1024 / 1024)} MB)`;
-    convertButton.disabled = false;
-  }
+  const file = fileInput.files?.[0];
+  if (!file) return;
+
+  // 入力ファイルをFFmpegに書き込む
+  ffmpeg.FS("writeFile", file.name, await fetchFile(file));
+
+  // FFmpegのログからメタデータを取得するためにログを解析
+  ffmpeg.setLogger(({ type, message }) => {
+    if (type === "fferr") {
+      // 解像度を取得
+      const resolutionMatch = message.match(/(\d{3,4}x\d{3,4})/);
+      if (resolutionMatch) {
+        videoMetadata.resolution = resolutionMatch[0];
+        document.getElementById("videoResolution")!.textContent =
+          videoMetadata.resolution;
+      }
+
+      // FPSを取得
+      const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
+      if (fpsMatch) {
+        videoMetadata.fps = parseFloat(fpsMatch[1]);
+        document.getElementById("videoFPS")!.textContent =
+          videoMetadata.fps.toString();
+        fpsInput.value = Math.min(videoMetadata.fps, 20).toString(); // FPSを制限
+      }
+    }
+  });
+
+  // メタデータ取得用にFFmpegを実行
+  await ffmpeg.run("-i", file.name);
+
+  // 必要なUIを表示
+  document.getElementById("videoInfo")!.style.display = "block";
+  document.getElementById("formatSelection")!.style.display = "block";
+  document.getElementById("videoSettings")!.style.display = "block";
+  document.getElementById("statusContainer")!.style.display = "block";
+  document.getElementById("progressContainer")!.style.display = "block";
+  document.getElementById("convertButtonGroup")!.style.display = "block";
+  convertButton.disabled = false; // コンバートボタンを有効化
 });
 
 // FFmpegのログから進捗を解析するための関数
@@ -210,10 +244,11 @@ convertButton.addEventListener("click", async () => {
   convertButton.disabled = true;
   statusMessage.textContent = "変換中...";
 
-  const files = fileInput.files;
-
-  // 複数ファイルを順次処理
-  for (let i = 0; i < files.length; i++) {
-    await processFile(files[i], audioFormat, videoFormat, resolution, fps);
-  }
+  await processFile(
+    fileInput.files[0],
+    audioFormat,
+    videoFormat,
+    resolution,
+    fps
+  );
 });

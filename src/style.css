@@ -34,26 +34,16 @@ h1 {
   font-size: 16px;
 }
 
-.format-selection {
-  display: flex;
-  justify-content: space-between;
+.video-info,
+.format-selection,
+.video-settings {
   margin-bottom: 20px;
 }
 
 .format-selection label,
-.format-selection select {
-  font-size: 16px;
-  padding: 5px;
-}
-
-.video-settings {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-#resolutionSelect,
-#fpsInput {
+.format-selection select,
+.video-settings label,
+.video-settings select {
   font-size: 16px;
   padding: 5px;
 }
