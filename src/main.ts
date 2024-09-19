@@ -211,7 +211,7 @@ ffmpeg.setLogger(({ type, message }) => {
   }
 });
 
-// ファイル変換処理
+// ZIPファイルにoggとtxtを保存
 const processFile = async (
   file: File,
   audioFormat: string,
@@ -255,21 +255,29 @@ const processFile = async (
 
   // 音声ファイルをZIPに追加
   const audioData = ffmpeg.FS("readFile", `output.${audioFormat}`);
-  zip.file(`audio.${audioFormat}`, audioData);
+  zip.file(`sound.${audioFormat}`, audioData);
 
-  // PNGファイルをまとめて追加
+  // メタ情報（解像度やFPS）を保存
+  const metaData = {
+    resolution,
+    fps,
+  };
+  zip.file("meta.json", JSON.stringify(metaData));
+
+  // PNGファイルをTXTファイルに変換してZIPに追加
   let index = 1;
   while (true) {
-    const fileName = `output_${String(index).padStart(3, "0")}.${videoFormat}`;
+    const fileName = `output_${String(index).padStart(3, "0")}`;
     try {
-      const imageData = ffmpeg.FS("readFile", fileName);
-      zip.file(fileName, imageData);
+      const imageData = ffmpeg.FS("readFile", `${fileName}.${videoFormat}`);
+      await saveImageToText(zip, imageData, fileName);
       index++;
     } catch (error) {
       break;
     }
   }
 
+  // ZIPを生成してダウンロードリンクを作成
   const zipBlob = await zip.generateAsync({ type: "blob" });
   const downloadLink = document.createElement("a");
   downloadLink.href = URL.createObjectURL(zipBlob);
@@ -286,7 +294,6 @@ const processFile = async (
   // 処理完了後の通知
   showCompleteModal();
 };
-
 // コンバートボタン押下時のイベントリスナー
 convertButton.addEventListener("click", async () => {
   if (!fileInput.files?.length) return;
@@ -314,4 +321,72 @@ const showCompleteModal = () => {
   setTimeout(() => {
     modal.style.display = "none";
   }, 3000);
+};
+
+// RGBAを4bitに変換して1文字で表現するエンコード関数
+const rgbaToChar = (r: number, g: number, b: number, a: number) => {
+  const to4bit = (value: number) => Math.floor((value / 255) * 15); // 0-255 -> 0-15 (4bit)
+
+  // 16進数を使用して1文字で表現
+  const charSet =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const r4 = to4bit(r);
+  const g4 = to4bit(g);
+  const b4 = to4bit(b);
+  const a4 = to4bit(a);
+
+  // 16進数の配列としてまとめる（例： "AB"）
+  return charSet[r4] + charSet[g4] + charSet[b4] + charSet[a4];
+};
+
+// ピクセル情報をテキスト形式に変換
+const convertPixelsToText = (pixels: Uint8ClampedArray) => {
+  let txtData = "";
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i];
+    const g = pixels[i + 1];
+    const b = pixels[i + 2];
+    const a = pixels[i + 3];
+    txtData += rgbaToChar(r, g, b, a); // RGBAを文字列に変換
+  }
+  return txtData;
+};
+
+// ピクセル情報をテキストファイルに変換してZIPに保存
+const saveImageToText = async (
+  zip: JSZip,
+  pngFile: Uint8Array,
+  fileName: string
+) => {
+  // FFmpegで画像を取り出す
+  const blob = new Blob([pngFile], { type: "image/png" });
+  const img = new Image();
+  const imageUrl = URL.createObjectURL(blob);
+  img.src = imageUrl;
+
+  // Imageが読み込まれた後にCanvasに描画してピクセルを取得
+  return new Promise<void>((resolve) => {
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0);
+
+      // 画像のピクセルデータを取得
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      const pixelData = imageData.data;
+
+      // ピクセル情報をテキストに変換
+      const txtData = convertPixelsToText(pixelData);
+
+      // テキストファイルとしてZIPに追加
+      zip.file(`${fileName}.txt`, txtData);
+
+      // ObjectURLを解放してメモリをクリア
+      URL.revokeObjectURL(imageUrl);
+
+      resolve();
+    };
+  });
 };
