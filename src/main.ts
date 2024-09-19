@@ -8,15 +8,11 @@ const ffmpeg = createFFmpeg({
   log: true,
 });
 
-let isCancelled = false;
 let totalDuration = 0;
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
-) as HTMLButtonElement;
-const cancelButton = document.getElementById(
-  "cancelButton"
 ) as HTMLButtonElement;
 const formatSelectAudio = document.getElementById(
   "formatSelectAudio"
@@ -24,6 +20,10 @@ const formatSelectAudio = document.getElementById(
 const formatSelectVideo = document.getElementById(
   "formatSelectVideo"
 ) as HTMLSelectElement;
+const resolutionSelect = document.getElementById(
+  "resolutionSelect"
+) as HTMLSelectElement;
+const fpsInput = document.getElementById("fpsInput") as HTMLInputElement;
 const statusMessage = document.getElementById(
   "statusMessage"
 ) as HTMLParagraphElement;
@@ -64,7 +64,6 @@ fileInput.addEventListener("change", async () => {
       files.length
     } ファイル, 合計: ${Math.round(totalFileSize / 1024 / 1024)} MB)`;
     convertButton.disabled = false;
-    cancelButton.disabled = false;
   }
 });
 
@@ -115,14 +114,6 @@ ffmpeg.setLogger(({ type, message }) => {
   }
 });
 
-// キャンセルボタンの動作
-cancelButton.addEventListener("click", () => {
-  isCancelled = true;
-  statusMessage.textContent = "変換がキャンセルされました。";
-  convertButton.disabled = false;
-  cancelButton.disabled = true;
-});
-
 // 処理完了時にモーダルを表示
 const showCompleteModal = () => {
   modal.style.display = "block";
@@ -137,7 +128,9 @@ modal.addEventListener("click", () => {
 const processFile = async (
   file: File,
   audioFormat: string,
-  videoFormat: string
+  videoFormat: string,
+  resolution: string,
+  fps: string
 ) => {
   const fileName = file.name.split(".")[0];
 
@@ -145,7 +138,6 @@ const processFile = async (
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
   logMessage.textContent += `音声を${audioFormat}形式で抽出しています...\n`;
-  if (isCancelled) return;
 
   await ffmpeg.run(
     "-i",
@@ -157,14 +149,13 @@ const processFile = async (
     `output.${audioFormat}`
   );
 
-  logMessage.textContent += `映像を20fpsで${videoFormat}形式で抽出しています...\n`;
-  if (isCancelled) return;
+  logMessage.textContent += `映像を${fps}fpsで${resolution}解像度に設定し、${videoFormat}形式で抽出しています...\n`;
 
   await ffmpeg.run(
     "-i",
     "input.mp4",
     "-vf",
-    "fps=20",
+    `fps=${fps},scale=${resolution}`,
     `output_%03d.${videoFormat}`
   );
 
@@ -202,7 +193,6 @@ const processFile = async (
 
   statusMessage.textContent = "変換が完了しました。";
   convertButton.disabled = false;
-  cancelButton.disabled = true;
 
   // 処理完了後の通知
   showCompleteModal();
@@ -214,16 +204,16 @@ convertButton.addEventListener("click", async () => {
 
   const audioFormat = formatSelectAudio.value;
   const videoFormat = formatSelectVideo.value;
+  const resolution = resolutionSelect.value;
+  const fps = fpsInput.value;
 
   convertButton.disabled = true;
   statusMessage.textContent = "変換中...";
 
   const files = fileInput.files;
-  isCancelled = false;
 
   // 複数ファイルを順次処理
   for (let i = 0; i < files.length; i++) {
-    await processFile(files[i], audioFormat, videoFormat);
-    if (isCancelled) break;
+    await processFile(files[i], audioFormat, videoFormat, resolution, fps);
   }
 });
