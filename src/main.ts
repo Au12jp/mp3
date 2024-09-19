@@ -14,7 +14,6 @@ let videoMetadata = {
   fps: 0,
 };
 
-// UI要素の取得
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
@@ -39,14 +38,14 @@ const progressBar = document.getElementById(
   "progressBar"
 ) as HTMLProgressElement;
 const logMessage = document.getElementById("logMessage") as HTMLPreElement;
-const detailedLog = document.getElementById("detailedLog") as HTMLPreElement; // 詳細ログ表示用
+const detailedLog = document.getElementById("detailedLog") as HTMLPreElement;
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
 const modal = document.getElementById("completeModal") as HTMLDivElement;
 const toggleLogButton = document.getElementById(
   "toggleLogButton"
-) as HTMLButtonElement; // 詳細ログのトグルボタン
+) as HTMLButtonElement;
 
 // 詳細ログ表示を切り替える関数
 let logVisible = false;
@@ -62,10 +61,12 @@ const logWithTimestamp = (message: string, isDetailed = false) => {
   const timeString = now.toLocaleTimeString("ja-JP", { hour12: false });
   const formattedMessage = `[${timeString}] ${message}\n`;
 
-  // 通常のログに表示
-  logMessage.textContent += formattedMessage;
+  // 通常のログに表示（詳細なFFmpegの進捗以外を通常ログに表示）
+  if (!isDetailed) {
+    logMessage.textContent += formattedMessage;
+  }
 
-  // 詳細ログに表示（必要に応じて）
+  // 詳細ログに表示
   if (isDetailed) {
     detailedLog.textContent += formattedMessage;
   }
@@ -91,7 +92,7 @@ fileInput.addEventListener("change", async () => {
   if (!file) return;
 
   // 入力ファイルをFFmpegに書き込む
-  await ffmpeg.FS("writeFile", file.name, await fetchFile(file));
+  ffmpeg.FS("writeFile", file.name, await fetchFile(file));
 
   let resolution = "";
   let fps = 0;
@@ -204,7 +205,8 @@ ffmpeg.setLogger(({ type, message }) => {
       parseProgress(message);
     }
 
-    logWithTimestamp(message, true); // 詳細ログに追加
+    // 詳細ログにのみ表示
+    logWithTimestamp(message, true);
   }
 });
 
@@ -219,7 +221,7 @@ const processFile = async (
   const fileName = file.name.split(".")[0];
 
   // 入力ファイルをFFmpegに書き込む
-  await ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
   logWithTimestamp(`音声を${audioFormat}形式で抽出しています...`);
 
@@ -305,12 +307,10 @@ convertButton.addEventListener("click", async () => {
   );
 });
 
-// 処理完了時にモーダルを表示
+// 処理完了時にモーダルを表示する関数
 const showCompleteModal = () => {
   modal.style.display = "block";
+  setTimeout(() => {
+    modal.style.display = "none";
+  }, 3000);
 };
-
-// モーダルを閉じる処理
-modal.addEventListener("click", () => {
-  modal.style.display = "none";
-});
