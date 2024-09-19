@@ -15,18 +15,20 @@ const convertButton = document.getElementById(
 const statusMessage = document.getElementById(
   "statusMessage"
 ) as HTMLParagraphElement;
+const progressPercent = document.getElementById(
+  "progressPercent"
+) as HTMLParagraphElement;
+const progressBar = document.getElementById(
+  "progressBar"
+) as HTMLProgressElement;
 const logMessage = document.getElementById("logMessage") as HTMLPreElement;
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
-const progressBar = document.getElementById("progressBar") as HTMLDivElement;
-const progressPercent = document.getElementById(
-  "progressPercent"
-) as HTMLSpanElement;
-const progressDetails = document.getElementById(
-  "progressDetails"
-) as HTMLParagraphElement;
 
+let totalFileSize: number;
+
+// FFmpegロード
 const loadFFmpeg = async () => {
   if (!ffmpeg.isLoaded()) {
     await ffmpeg.load();
@@ -34,45 +36,50 @@ const loadFFmpeg = async () => {
   }
 };
 
+// ページロード時にFFmpegをプリロード
 window.addEventListener("load", () => {
   logMessage.textContent += "FFmpegをロード中...\n";
-  loadFFmpeg(); // ページ読み込み時にプリロード
+  loadFFmpeg();
 });
 
-// プログレスバーを更新する関数
-const updateProgress = (percent: number, loaded: number, total: number) => {
-  const percentage = Math.round((loaded / total) * 100);
-  progressBar.style.width = `${percentage}%`;
-  progressPercent.textContent = `${percentage}%`;
-  progressDetails.textContent = `読み込み中: ${loaded} / ${total} bytes (${percent}%)`;
-};
-
-// fetch関数を拡張して進捗状況を取得
-const fetchWithProgress = async (url: string) => {
-  const response = await fetch(url);
-  const reader = response.body?.getReader();
-  const contentLength = +response.headers.get("Content-Length")!;
-
-  let receivedLength = 0;
-  const chunks: Uint8Array[] = [];
-
-  while (true) {
-    const { done, value } = await reader!.read();
-    if (done) break;
-    chunks.push(value);
-    receivedLength += value.length;
-    updateProgress(
-      (receivedLength / contentLength) * 100,
-      receivedLength,
-      contentLength
-    );
+// ファイル選択時のイベントリスナー
+fileInput.addEventListener("change", async () => {
+  if (fileInput.files?.length) {
+    const file = fileInput.files[0];
+    totalFileSize = file.size; // ファイルサイズを取得
+    statusMessage.textContent = `ファイルが選択されました: ${Math.round(
+      totalFileSize / 1024 / 1024
+    )} MB`;
+    convertButton.disabled = false;
   }
+});
 
-  const blob = new Blob(chunks);
-  return new Uint8Array(await blob.arrayBuffer());
+// FFmpegのログから進捗を解析する関数
+const parseProgress = (log: string) => {
+  const timeRegex = /time=(\d+:\d+:\d+\.\d+)/;
+  const match = timeRegex.exec(log);
+
+  if (match && match[1]) {
+    const timeParts = match[1].split(":").map(Number);
+    const seconds = timeParts[0] * 3600 + timeParts[1] * 60 + timeParts[2];
+    return seconds;
+  }
+  return null;
 };
 
-// ファイルの処理
+// FFmpegのログを処理して進捗を表示
+ffmpeg.setLogger(({ type, message }) => {
+  if (type === "fferr") {
+    const timeInSeconds = parseProgress(message);
+    if (timeInSeconds) {
+      const progress = Math.min((timeInSeconds / 60) * 100, 100); // 例: 60秒動画として
+      progressBar.value = progress;
+      progressPercent.textContent = `進捗: ${progress.toFixed(2)}%`;
+    }
+  }
+});
+
+// ファイル変換処理
 const processFile = async (file: File) => {
   const fileName = file.name.split(".")[0];
 
@@ -81,18 +88,13 @@ const processFile = async (file: File) => {
 
   logMessage.textContent += "音声と映像の抽出を開始しています...\n";
 
-  // 進捗をリセット
-  updateProgress(0, 0, file.size);
-
   // 1. 音声の抽出（ogg形式）
   logMessage.textContent += "音声をogg形式で抽出しています...\n";
   await ffmpeg.run("-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg");
-  updateProgress(50, file.size / 2, file.size);
 
   // 2. 映像の抽出 (20fpsでpng画像として出力)
   logMessage.textContent += "映像を20fpsでpng形式で抽出しています...\n";
   await ffmpeg.run("-i", "input.mp4", "-vf", "fps=20", "output_%03d.png");
-  updateProgress(100, file.size, file.size);
 
   logMessage.textContent += "変換が完了しました。\n";
 
