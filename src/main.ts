@@ -4,7 +4,7 @@ import JSZip from "jszip";
 // FFmpegの初期化
 const ffmpeg = createFFmpeg({
   corePath:
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd/ffmpeg-core.js",
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js",
   log: true,
 });
 
@@ -19,6 +19,13 @@ const logMessage = document.getElementById("logMessage") as HTMLPreElement;
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
+const progressBar = document.getElementById("progressBar") as HTMLDivElement;
+const progressPercent = document.getElementById(
+  "progressPercent"
+) as HTMLSpanElement;
+const progressDetails = document.getElementById(
+  "progressDetails"
+) as HTMLParagraphElement;
 
 const loadFFmpeg = async () => {
   if (!ffmpeg.isLoaded()) {
@@ -32,15 +39,40 @@ window.addEventListener("load", () => {
   loadFFmpeg(); // ページ読み込み時にプリロード
 });
 
-// ファイル選択時のイベントリスナー
-fileInput.addEventListener("change", () => {
-  if (fileInput.files?.length) {
-    statusMessage.textContent = "ファイルが選択されました。";
-    convertButton.disabled = false; // ボタンを有効化
-  }
-});
+// プログレスバーを更新する関数
+const updateProgress = (percent: number, loaded: number, total: number) => {
+  const percentage = Math.round((loaded / total) * 100);
+  progressBar.style.width = `${percentage}%`;
+  progressPercent.textContent = `${percentage}%`;
+  progressDetails.textContent = `読み込み中: ${loaded} / ${total} bytes (${percent}%)`;
+};
 
-// コンバート処理
+// fetch関数を拡張して進捗状況を取得
+const fetchWithProgress = async (url: string) => {
+  const response = await fetch(url);
+  const reader = response.body?.getReader();
+  const contentLength = +response.headers.get("Content-Length")!;
+
+  let receivedLength = 0;
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader!.read();
+    if (done) break;
+    chunks.push(value);
+    receivedLength += value.length;
+    updateProgress(
+      (receivedLength / contentLength) * 100,
+      receivedLength,
+      contentLength
+    );
+  }
+
+  const blob = new Blob(chunks);
+  return new Uint8Array(await blob.arrayBuffer());
+};
+
+// ファイルの処理
 const processFile = async (file: File) => {
   const fileName = file.name.split(".")[0];
 
@@ -49,13 +81,18 @@ const processFile = async (file: File) => {
 
   logMessage.textContent += "音声と映像の抽出を開始しています...\n";
 
+  // 進捗をリセット
+  updateProgress(0, 0, file.size);
+
   // 1. 音声の抽出（ogg形式）
   logMessage.textContent += "音声をogg形式で抽出しています...\n";
   await ffmpeg.run("-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg");
+  updateProgress(50, file.size / 2, file.size);
 
   // 2. 映像の抽出 (20fpsでpng画像として出力)
   logMessage.textContent += "映像を20fpsでpng形式で抽出しています...\n";
   await ffmpeg.run("-i", "input.mp4", "-vf", "fps=20", "output_%03d.png");
+  updateProgress(100, file.size, file.size);
 
   logMessage.textContent += "変換が完了しました。\n";
 

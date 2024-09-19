@@ -6,9 +6,6 @@
     <title>FFmpeg File Converter</title>
     <link rel="stylesheet" href="style.css" />
     <script src="coi-serviceworker.js"></script>
-    <script src="
-https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd/ffmpeg-core.min.js
-"></script>
   </head>
   <body>
     <div class="container">
@@ -26,6 +23,12 @@ https://cdn.jsdelivr.net/npm/@ffmpeg/core-mt@0.12.6/dist/umd/ffmpeg-core.min.js
       <button id="convertButton" class="convert-button" disabled>
         コンバート開始
       </button>
+
+      <div class="progress-container">
+        <div id="progressBar" class="progress-bar"></div>
+      </div>
+      <p id="progressPercent">0%</p>
+      <p id="progressDetails">ファイルを選択してください。</p>
 
       <div id="downloadLinkContainer" class="download-container"></div>
 

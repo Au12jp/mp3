@@ -96,3 +96,29 @@ h2 {
   font-family: monospace;
   font-size: 14px;
 }
+
+.progress-container {
+  width: 100%;
+  background-color: #f3f3f3;
+  border-radius: 4px;
+  margin: 20px 0;
+}
+
+.progress-bar {
+  height: 24px;
+  background-color: #4caf50;
+  width: 0%;
+  border-radius: 4px;
+  transition: width 0.4s ease;
+}
+
+#progressPercent {
+  text-align: center;
+  font-size: 18px;
+}
+
+#progressDetails {
+  text-align: center;
+  font-size: 14px;
+  color: #555;
+}
