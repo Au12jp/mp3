@@ -11,30 +11,64 @@
     <div class="container">
       <h1>FFmpeg File Converter</h1>
 
+      <!-- ファイル選択 -->
       <div class="file-upload">
         <label for="fileInput" class="file-label">ファイルを選択</label>
-        <input type="file" id="fileInput" class="file-input" />
+        <input type="file" id="fileInput" class="file-input" multiple />
       </div>
 
+      <!-- フォーマット選択 -->
+      <div class="format-selection">
+        <label for="formatSelectAudio">音声フォーマット:</label>
+        <select id="formatSelectAudio">
+          <option value="ogg">OGG</option>
+          <option value="mp3">MP3</option>
+        </select>
+
+        <label for="formatSelectVideo">映像フォーマット:</label>
+        <select id="formatSelectVideo">
+          <option value="png">PNG</option>
+          <option value="jpg">JPG</option>
+        </select>
+      </div>
+
+      <!-- 状態表示 -->
       <div class="status">
         <p id="statusMessage">ファイルを選択してください。</p>
+        <p id="progressPercent">進捗: 0%</p>
       </div>
 
-      <button id="convertButton" class="convert-button" disabled>
-        コンバート開始
-      </button>
-
-      <div class="progress-container">
-        <div id="progressBar" class="progress-bar"></div>
+      <!-- 進捗バー -->
+      <div class="progress-bar">
+        <progress id="progressBar" value="0" max="100"></progress>
       </div>
-      <p id="progressPercent">0%</p>
-      <p id="progressDetails">ファイルを選択してください。</p>
 
+      <!-- ボタン -->
+      <div class="button-group">
+        <button id="convertButton" class="convert-button" disabled>
+          コンバート開始
+        </button>
+        <!-- キャンセルボタンを追加 -->
+        <button id="cancelButton" class="cancel-button" disabled>
+          キャンセル
+        </button>
+      </div>
+
+      <!-- ダウンロードリンク -->
       <div id="downloadLinkContainer" class="download-container"></div>
 
+      <!-- ログ -->
       <div class="log-container">
         <h2>ログ</h2>
         <pre id="logMessage" class="log-message"></pre>
+      </div>
+
+      <!-- 処理完了モーダル -->
+      <div id="completeModal" class="modal">
+        <div class="modal-content">
+          <p>処理が完了しました！</p>
+          <button class="close-modal">閉じる</button>
+        </div>
       </div>
     </div>
 
