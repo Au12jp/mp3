@@ -54,7 +54,6 @@ fileInput.addEventListener("change", async () => {
   }
 });
 
-// FFmpegのログから進捗を解析する関数
 const parseProgress = (log: string) => {
   const timeRegex = /time=(\d+:\d+:\d+\.\d+)/;
   const match = timeRegex.exec(log);
