@@ -5,7 +5,7 @@ import JSZip from "jszip";
 const ffmpeg = createFFmpeg({
   corePath:
     "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js",
-  log: true, // ログが多すぎる場合、falseにしてパフォーマンスを改善
+  log: true,
 });
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
@@ -40,34 +40,22 @@ fileInput.addEventListener("change", () => {
   }
 });
 
-// 並列処理による変換の最適化
+// コンバート処理
 const processFile = async (file: File) => {
   const fileName = file.name.split(".")[0];
 
   // 入力ファイルをFFmpegに書き込む
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  // 音声の抽出と映像の抽出を並列処理
   logMessage.textContent += "音声と映像の抽出を開始しています...\n";
 
-  const audioProcess = ffmpeg.run(
-    "-i",
-    "input.mp4",
-    "-q:a",
-    "0",
-    "-map",
-    "a",
-    "output.ogg"
-  );
-  const videoProcess = ffmpeg.run(
-    "-i",
-    "input.mp4",
-    "-vf",
-    "fps=20",
-    "output_%03d.png"
-  );
+  // 1. 音声の抽出（ogg形式）
+  logMessage.textContent += "音声をogg形式で抽出しています...\n";
+  await ffmpeg.run("-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg");
 
-  await Promise.all([audioProcess, videoProcess]);
+  // 2. 映像の抽出 (20fpsでpng画像として出力)
+  logMessage.textContent += "映像を20fpsでpng形式で抽出しています...\n";
+  await ffmpeg.run("-i", "input.mp4", "-vf", "fps=20", "output_%03d.png");
 
   logMessage.textContent += "変換が完了しました。\n";
 
