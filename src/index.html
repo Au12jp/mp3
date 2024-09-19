@@ -6,92 +6,77 @@
     <title>FFmpeg File Converter</title>
     <link rel="stylesheet" href="style.css" />
     <script src="coi-serviceworker.js"></script>
-    <script src="main.js" defer></script>
   </head>
   <body>
     <div class="container">
       <h1>FFmpeg File Converter</h1>
 
-      <!-- ファイル選択 -->
       <div class="file-upload">
         <label for="fileInput" class="file-label">ファイルを選択</label>
-        <input
-          type="file"
-          id="fileInput"
-          class="file-input"
-          accept="video/mp4"
-        />
+        <input type="file" id="fileInput" class="file-input" />
       </div>
 
-      <!-- 動画メタデータ（解像度やFPS） -->
-      <div class="video-info" id="videoInfo" style="display: none">
-        <p>解像度: <span id="videoResolution"></span></p>
-        <p>FPS: <span id="videoFPS"></span></p>
+      <div class="settings">
+        <div id="videoInfo" style="display: none">
+          <p>解像度: <span id="videoResolution"></span></p>
+          <p>FPS: <span id="videoFPS"></span></p>
+        </div>
+
+        <div id="formatSelection" style="display: none">
+          <label for="formatSelectAudio">音声フォーマット:</label>
+          <select id="formatSelectAudio">
+            <option value="ogg">ogg</option>
+          </select>
+
+          <label for="formatSelectVideo">映像フォーマット:</label>
+          <select id="formatSelectVideo">
+            <option value="png">png</option>
+          </select>
+        </div>
+
+        <div id="videoSettings" style="display: none">
+          <label for="resolutionSelect">解像度:</label>
+          <select id="resolutionSelect">
+            <option value="1920x1080">1080p (Full HD)</option>
+            <option value="1280x720">720p (HD)</option>
+            <option value="640x360">360p (SD)</option>
+            <option value="256x144">144p</option>
+          </select>
+
+          <label for="fpsInput">FPS:</label>
+          <input type="number" id="fpsInput" value="20" min="1" max="60" />
+        </div>
       </div>
 
-      <!-- フォーマット選択 -->
-      <div class="format-selection" id="formatSelection" style="display: none">
-        <label for="formatSelectAudio">音声フォーマット:</label>
-        <select id="formatSelectAudio">
-          <option value="ogg">OGG</option>
-          <option value="mp3">MP3</option>
-        </select>
-
-        <label for="formatSelectVideo">映像フォーマット:</label>
-        <select id="formatSelectVideo">
-          <option value="png">PNG</option>
-          <option value="jpg">JPG</option>
-        </select>
+      <div id="statusContainer" style="display: none">
+        <p id="statusMessage">ステータス: 準備中...</p>
       </div>
 
-      <!-- 解像度とFPS設定 -->
-      <div class="video-settings" id="videoSettings" style="display: none">
-        <label for="resolutionSelect">解像度:</label>
-        <select id="resolutionSelect">
-          <option value="1920x1080">1080p (Full HD)</option>
-          <option value="1280x720">720p (HD)</option>
-          <option value="640x360">360p (SD)</option>
-          <option value="256x144">144p</option>
-        </select>
-
-        <label for="fpsInput">FPS:</label>
-        <input type="number" id="fpsInput" min="1" max="20" />
-      </div>
-
-      <!-- 状態表示 -->
-      <div class="status" id="statusContainer" style="display: none">
-        <p id="statusMessage">ファイルを選択してください。</p>
+      <div id="progressContainer" style="display: none">
+        <progress id="progressBar" value="0" max="100"></progress>
         <p id="progressPercent">進捗: 0%</p>
       </div>
 
-      <!-- 進捗バー -->
-      <div class="progress-bar" id="progressContainer" style="display: none">
-        <progress id="progressBar" value="0" max="100"></progress>
-      </div>
-
-      <!-- ボタン -->
-      <div class="button-group" id="convertButtonGroup" style="display: none">
+      <div id="convertButtonGroup" style="display: none">
         <button id="convertButton" class="convert-button" disabled>
           コンバート開始
         </button>
       </div>
 
-      <!-- ダウンロードリンク -->
-      <div id="downloadLinkContainer" class="download-container"></div>
+      <div id="downloadLinkContainer"></div>
 
-      <!-- ログ -->
       <div class="log-container">
         <h2>ログ</h2>
         <pre id="logMessage" class="log-message"></pre>
+        <button id="toggleLogButton" class="toggle-log-button">Show Log</button>
+        <pre id="detailedLog" class="detailed-log" style="display: none"></pre>
       </div>
 
-      <!-- 処理完了モーダル -->
-      <div id="completeModal" class="modal">
-        <div class="modal-content">
-          <p>処理が完了しました！</p>
-          <button class="close-modal">閉じる</button>
-        </div>
+      <div id="completeModal" class="modal" style="display: none">
+        <p>変換が完了しました。</p>
       </div>
     </div>
+
+    <script src="main.js"></script>
   </body>
 </html>
