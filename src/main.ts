@@ -2,7 +2,12 @@ import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
 import JSZip from "jszip";
 
 // FFmpegの初期化
-const ffmpeg = createFFmpeg({ log: true });
+const ffmpeg = createFFmpeg({
+  corePath:
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js",
+  log: true, // ログが多すぎる場合、falseにしてパフォーマンスを改善
+});
+
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
@@ -15,6 +20,18 @@ const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
 
+const loadFFmpeg = async () => {
+  if (!ffmpeg.isLoaded()) {
+    await ffmpeg.load();
+    logMessage.textContent += "FFmpegがロードされました。\n";
+  }
+};
+
+window.addEventListener("load", () => {
+  logMessage.textContent += "FFmpegをロード中...\n";
+  loadFFmpeg(); // ページ読み込み時にプリロード
+});
+
 // ファイル選択時のイベントリスナー
 fileInput.addEventListener("change", () => {
   if (fileInput.files?.length) {
@@ -23,34 +40,34 @@ fileInput.addEventListener("change", () => {
   }
 });
 
-// コンバートボタン押下時のイベントリスナー
-convertButton.addEventListener("click", async () => {
-  if (!fileInput.files?.length) return;
-
-  convertButton.disabled = true; // ボタンを無効化
-  statusMessage.textContent = "変換中...";
-
-  if (!ffmpeg.isLoaded()) {
-    logMessage.textContent += "FFmpegをロード中...\n";
-    await ffmpeg.load();
-  }
-
-  logMessage.textContent += "FFmpegがロードされました。\n";
-
-  // ファイルの読み込み
-  const file = fileInput.files[0];
+// 並列処理による変換の最適化
+const processFile = async (file: File) => {
   const fileName = file.name.split(".")[0];
 
+  // 入力ファイルをFFmpegに書き込む
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
-  logMessage.textContent += "ファイルを読み込みました。\n";
 
-  // 音声の抽出（ogg形式）
-  logMessage.textContent += "音声をogg形式で抽出しています...\n";
-  await ffmpeg.run("-i", "input.mp4", "-q:a", "0", "-map", "a", "output.ogg");
+  // 音声の抽出と映像の抽出を並列処理
+  logMessage.textContent += "音声と映像の抽出を開始しています...\n";
 
-  // 映像の抽出 (20fpsでpng画像として出力)
-  logMessage.textContent += "映像を20fpsでpng形式で抽出しています...\n";
-  await ffmpeg.run("-i", "input.mp4", "-vf", "fps=20", "output_%03d.png");
+  const audioProcess = ffmpeg.run(
+    "-i",
+    "input.mp4",
+    "-q:a",
+    "0",
+    "-map",
+    "a",
+    "output.ogg"
+  );
+  const videoProcess = ffmpeg.run(
+    "-i",
+    "input.mp4",
+    "-vf",
+    "fps=20",
+    "output_%03d.png"
+  );
+
+  await Promise.all([audioProcess, videoProcess]);
 
   logMessage.textContent += "変換が完了しました。\n";
 
@@ -70,8 +87,7 @@ convertButton.addEventListener("click", async () => {
       zip.file(fileName, imageData);
       index++;
     } catch (error) {
-      // すべてのフレームを読み終わった場合に抜ける
-      break;
+      break; // すべてのフレームを読み終わった場合に抜ける
     }
   }
 
@@ -88,4 +104,17 @@ convertButton.addEventListener("click", async () => {
 
   statusMessage.textContent = "変換が完了しました。";
   convertButton.disabled = false; // ボタンを再度有効化
+};
+
+// コンバートボタン押下時のイベントリスナー
+convertButton.addEventListener("click", async () => {
+  if (!fileInput.files?.length) return;
+
+  convertButton.disabled = true; // ボタンを無効化
+  statusMessage.textContent = "変換中...";
+
+  const file = fileInput.files[0];
+
+  // ファイルの処理を実行
+  await processFile(file);
 });
