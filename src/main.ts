@@ -4,7 +4,7 @@ import JSZip from "jszip";
 // FFmpegの初期化
 const ffmpeg = createFFmpeg({
   corePath:
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
+    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js",
   log: true,
 });
 
