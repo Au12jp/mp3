@@ -14,6 +14,7 @@ let videoMetadata = {
   fps: 0,
 };
 
+// UI要素の取得
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
   "convertButton"
@@ -38,55 +39,112 @@ const progressBar = document.getElementById(
   "progressBar"
 ) as HTMLProgressElement;
 const logMessage = document.getElementById("logMessage") as HTMLPreElement;
+const detailedLog = document.getElementById("detailedLog") as HTMLPreElement; // 詳細ログ表示用
 const downloadLinkContainer = document.getElementById(
   "downloadLinkContainer"
 ) as HTMLDivElement;
 const modal = document.getElementById("completeModal") as HTMLDivElement;
+const toggleLogButton = document.getElementById(
+  "toggleLogButton"
+) as HTMLButtonElement; // 詳細ログのトグルボタン
 
-let totalFileSize: number;
+// 詳細ログ表示を切り替える関数
+let logVisible = false;
+toggleLogButton.addEventListener("click", () => {
+  logVisible = !logVisible;
+  detailedLog.style.display = logVisible ? "block" : "none";
+  toggleLogButton.textContent = logVisible ? "Hide Log" : "Show Log";
+});
+
+// ログに時間を含めて表示する関数
+const logWithTimestamp = (message: string, isDetailed = false) => {
+  const now = new Date();
+  const timeString = now.toLocaleTimeString("ja-JP", { hour12: false });
+  const formattedMessage = `[${timeString}] ${message}\n`;
+
+  // 通常のログに表示
+  logMessage.textContent += formattedMessage;
+
+  // 詳細ログに表示（必要に応じて）
+  if (isDetailed) {
+    detailedLog.textContent += formattedMessage;
+  }
+};
 
 // FFmpegロード
 const loadFFmpeg = async () => {
   if (!ffmpeg.isLoaded()) {
     await ffmpeg.load();
-    logMessage.textContent += "FFmpegがロードされました。\n";
+    logWithTimestamp("FFmpegがロードされました。");
   }
 };
 
 // ページロード時にFFmpegをプリロード
 window.addEventListener("load", () => {
-  logMessage.textContent += "FFmpegをロード中...\n";
+  logWithTimestamp("FFmpegをロード中...");
   loadFFmpeg();
 });
 
+// ファイル選択時のイベントリスナー
 fileInput.addEventListener("change", async () => {
   const file = fileInput.files?.[0];
   if (!file) return;
 
   // 入力ファイルをFFmpegに書き込む
-  ffmpeg.FS("writeFile", file.name, await fetchFile(file));
+  await ffmpeg.FS("writeFile", file.name, await fetchFile(file));
+
+  let resolution = "";
+  let fps = 0;
 
   // FFmpegのログからメタデータを取得するためにログを解析
   ffmpeg.setLogger(({ type, message }) => {
     if (type === "fferr") {
+      logWithTimestamp(message, true); // 詳細ログに追加
+
       // 解像度を取得
       const resolutionMatch = message.match(/(\d{3,4}x\d{3,4})/);
       if (resolutionMatch) {
-        videoMetadata.resolution = resolutionMatch[0];
-        document.getElementById("videoResolution")!.textContent =
-          videoMetadata.resolution;
+        resolution = resolutionMatch[0];
+        document.getElementById("videoResolution")!.textContent = resolution;
+
+        // 解像度の制限
+        const availableResolutions = [
+          { value: "1920x1080", label: "1080p (Full HD)" },
+          { value: "1280x720", label: "720p (HD)" },
+          { value: "640x360", label: "360p (SD)" },
+          { value: "256x144", label: "144p" },
+        ];
+
+        const maxResolution = resolution.split("x").map(Number);
+        resolutionSelect.innerHTML = ""; // 解像度の選択肢をクリア
+
+        // 使用可能な解像度のみ追加
+        availableResolutions.forEach((res) => {
+          const resNumbers = res.value.split("x").map(Number);
+          if (
+            resNumbers[0] <= maxResolution[0] &&
+            resNumbers[1] <= maxResolution[1]
+          ) {
+            const option = document.createElement("option");
+            option.value = res.value;
+            option.textContent = res.label;
+            resolutionSelect.appendChild(option);
+          }
+        });
       }
 
       // FPSを取得
       const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
       if (fpsMatch) {
-        videoMetadata.fps = parseFloat(fpsMatch[1]);
-        document.getElementById("videoFPS")!.textContent =
-          videoMetadata.fps.toString();
-        fpsInput.value = Math.min(videoMetadata.fps, 20).toString(); // FPSを制限
+        fps = parseFloat(fpsMatch[1]);
+        document.getElementById("videoFPS")!.textContent = fps.toString();
+        fpsInput.value = Math.min(fps, 20).toString(); // FPSを制限
       }
     }
   });
+
+  videoMetadata.fps = fps;
+  videoMetadata.resolution = resolution;
 
   // メタデータ取得用にFFmpegを実行
   await ffmpeg.run("-i", file.name);
@@ -145,17 +203,9 @@ ffmpeg.setLogger(({ type, message }) => {
     if (message.includes("time=")) {
       parseProgress(message);
     }
+
+    logWithTimestamp(message, true); // 詳細ログに追加
   }
-});
-
-// 処理完了時にモーダルを表示
-const showCompleteModal = () => {
-  modal.style.display = "block";
-};
-
-// モーダルを閉じる処理
-modal.addEventListener("click", () => {
-  modal.style.display = "none";
 });
 
 // ファイル変換処理
@@ -169,9 +219,9 @@ const processFile = async (
   const fileName = file.name.split(".")[0];
 
   // 入力ファイルをFFmpegに書き込む
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+  await ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
-  logMessage.textContent += `音声を${audioFormat}形式で抽出しています...\n`;
+  logWithTimestamp(`音声を${audioFormat}形式で抽出しています...`);
 
   await ffmpeg.run(
     "-i",
@@ -183,7 +233,9 @@ const processFile = async (
     `output.${audioFormat}`
   );
 
-  logMessage.textContent += `映像を${fps}fpsで${resolution}解像度に設定し、${videoFormat}形式で抽出しています...\n`;
+  logWithTimestamp(
+    `映像を${fps}fpsで${resolution}解像度に設定し、${videoFormat}形式で抽出しています...`
+  );
 
   await ffmpeg.run(
     "-i",
@@ -193,7 +245,7 @@ const processFile = async (
     `output_%03d.${videoFormat}`
   );
 
-  logMessage.textContent += "変換が完了しました。\n";
+  logWithTimestamp("変換が完了しました。");
 
   // ZIPにまとめる
   const zip = new JSZip();
@@ -251,4 +303,14 @@ convertButton.addEventListener("click", async () => {
     resolution,
     fps
   );
+});
+
+// 処理完了時にモーダルを表示
+const showCompleteModal = () => {
+  modal.style.display = "block";
+};
+
+// モーダルを閉じる処理
+modal.addEventListener("click", () => {
+  modal.style.display = "none";
 });
