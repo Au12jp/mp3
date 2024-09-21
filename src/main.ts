@@ -74,7 +74,7 @@ const logWithTimestamp = (message: string, isDetailed = false) => {
 
 // 音声を処理する関数
 const processAudio = async (
-  ffmpeg: any,
+  ffmpeg: FFmpeg,
   file: File,
   audioFormat: string
 ): Promise<Uint8Array> => {
@@ -84,14 +84,14 @@ const processAudio = async (
   ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
 
   try {
-    // 音声を抽出する
+    // 音声を抽出する。音声ストリームがない場合に備えて '?' を追加
     await ffmpeg.run(
       "-i",
       "input.mp4",
       "-q:a",
       "0",
       "-map",
-      "a",
+      "a?", // ストリームがない場合でもエラーにならないように '?' を追加
       `output.${audioFormat}`
     );
     logWithTimestamp("音声の抽出が完了しました。");
@@ -100,9 +100,14 @@ const processAudio = async (
     throw error;
   }
 
-  // 抽出された音声データを取得
-  const audioData = ffmpeg.FS("readFile", `output.${audioFormat}`);
-  return audioData;
+  try {
+    // 抽出された音声データを取得
+    const audioData = ffmpeg.FS("readFile", `output.${audioFormat}`);
+    return audioData;
+  } catch (error) {
+    logWithTimestamp(`抽出された音声ファイルが見つかりません: ${error}`);
+    throw error;
+  }
 };
 
 // 動画を指定した時間ごとに分割する関数
@@ -372,7 +377,7 @@ fileInput.addEventListener("change", async () => {
 
 // MP4ファイルを処理する関数
 const processMp4File = async (file: File) => {
-  logWithTimestamp("MP4ファイルを処理中...");
+  logWithTimestamp("MP4ファイル構造を処理中...");
 
   try {
     const { resolution, fps } = await getVideoMetadata(file);
@@ -415,6 +420,7 @@ const processMp4File = async (file: File) => {
   } catch (error) {
     logWithTimestamp(`メタデータの取得に失敗しました: ${error}`);
   }
+  logWithTimestamp("MP4メタ情報を取得しました");
 };
 
 // RGBAを4bitに変換して1文字で表現するエンコード関数
