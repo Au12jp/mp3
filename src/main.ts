@@ -72,6 +72,51 @@ const logWithTimestamp = (message: string, isDetailed = false) => {
   }
 };
 
+// 動画ファイルからメタデータを取得する関数
+const getVideoMetadata = async (
+  file: File
+): Promise<{ resolution: string; fps: number }> => {
+  return new Promise<{ resolution: string; fps: number }>(
+    async (resolve, reject) => {
+      // FFmpegにファイルを読み込む
+      ffmpeg.FS("writeFile", "temp.mp4", await fetchFile(file));
+
+      let resolution = "";
+      let fps = 0;
+
+      // メタデータ取得のためのFFmpegコマンドを実行
+      ffmpeg.setLogger(({ type, message }) => {
+        if (type === "fferr") {
+          // 解像度を取得
+          const resolutionMatch = message.match(/(\d{3,4}x\d{3,4})/);
+          if (resolutionMatch) {
+            resolution = resolutionMatch[0];
+          }
+
+          // FPSを取得
+          const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
+          if (fpsMatch) {
+            fps = parseFloat(fpsMatch[1]);
+          }
+        }
+      });
+
+      // メタデータ取得用にFFmpegを実行
+      await ffmpeg.run("-i", "temp.mp4");
+
+      // 解像度とFPSが取得できたらresolve
+      if (resolution && fps) {
+        resolve({ resolution, fps });
+      } else {
+        reject("Unable to extract metadata from video.");
+      }
+
+      // 一時ファイルを削除
+      ffmpeg.FS("unlink", "temp.mp4");
+    }
+  );
+};
+
 // FFmpegロード
 const loadFFmpeg = async () => {
   if (!ffmpeg.isLoaded()) {
@@ -93,69 +138,50 @@ fileInput.addEventListener("change", async () => {
 
   if (file.name.endsWith(".zip")) {
     logWithTimestamp("ZIPファイルを処理中...");
-    // ZIP処理関数
     await processZipFile(file);
   } else if (file.name.endsWith(".mp4")) {
-    logWithTimestamp("MP4ファイルを処理中...");
+    await processMp4File(file);
+  }
+});
 
-    // 入力ファイルをFFmpegに書き込む
-    ffmpeg.FS("writeFile", file.name, await fetchFile(file));
+// MP4ファイルを処理する関数
+const processMp4File = async (file: File) => {
+  logWithTimestamp("MP4ファイルを処理中...");
 
-    let resolution = "";
-    let fps = 0;
+  try {
+    const { resolution, fps } = await getVideoMetadata(file);
 
-    // FFmpegのログからメタデータを取得するためにログを解析
-    ffmpeg.setLogger(({ type, message }) => {
-      if (type === "fferr") {
-        logWithTimestamp(message, true); // 詳細ログに追加
+    // 解像度とFPSをUIに反映
+    document.getElementById("videoResolution")!.textContent = resolution;
+    document.getElementById("videoFPS")!.textContent = fps.toString();
 
-        // 解像度を取得
-        const resolutionMatch = message.match(/(\d{3,4}x\d{3,4})/);
-        if (resolutionMatch) {
-          resolution = resolutionMatch[0];
-          document.getElementById("videoResolution")!.textContent = resolution;
+    // 解像度の制限とUI設定
+    const availableResolutions = [
+      { value: "1920x1080", label: "1080p (Full HD)" },
+      { value: "1280x720", label: "720p (HD)" },
+      { value: "640x360", label: "360p (SD)" },
+      { value: "256x144", label: "144p" },
+    ];
 
-          // 解像度の制限
-          const availableResolutions = [
-            { value: "1920x1080", label: "1080p (Full HD)" },
-            { value: "1280x720", label: "720p (HD)" },
-            { value: "640x360", label: "360p (SD)" },
-            { value: "256x144", label: "144p" },
-          ];
+    const maxResolution = resolution.split("x").map(Number);
+    resolutionSelect.innerHTML = ""; // 解像度の選択肢をクリア
 
-          const maxResolution = resolution.split("x").map(Number);
-          resolutionSelect.innerHTML = ""; // 解像度の選択肢をクリア
-
-          // 使用可能な解像度のみ追加
-          availableResolutions.forEach((res) => {
-            const resNumbers = res.value.split("x").map(Number);
-            if (
-              resNumbers[0] <= maxResolution[0] &&
-              resNumbers[1] <= maxResolution[1]
-            ) {
-              const option = document.createElement("option");
-              option.value = res.value;
-              option.textContent = res.label;
-              resolutionSelect.appendChild(option);
-            }
-          });
-        }
-
-        // FPSを取得
-        const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
-        if (fpsMatch) {
-          fps = parseFloat(fpsMatch[1]);
-          document.getElementById("videoFPS")!.textContent = fps.toString();
-          fpsInput.value = Math.min(fps, 20).toString(); // FPSを制限
-        }
+    // 使用可能な解像度のみ追加
+    availableResolutions.forEach((res) => {
+      const resNumbers = res.value.split("x").map(Number);
+      if (
+        resNumbers[0] <= maxResolution[0] &&
+        resNumbers[1] <= maxResolution[1]
+      ) {
+        const option = document.createElement("option");
+        option.value = res.value;
+        option.textContent = res.label;
+        resolutionSelect.appendChild(option);
       }
     });
 
-    videoMetadata.fps = fps;
-    videoMetadata.resolution = resolution;
-
-    // メタデータ取得用にFFmpegを実行
-    await ffmpeg.run("-i", file.name);
+    // FPS設定
+    fpsInput.value = Math.min(fps, 20).toString();
 
     // 必要なUIを表示
     document.getElementById("videoInfo")!.style.display = "block";
@@ -165,8 +191,10 @@ fileInput.addEventListener("change", async () => {
     document.getElementById("progressContainer")!.style.display = "block";
     document.getElementById("convertButtonGroup")!.style.display = "block";
     convertButton.disabled = false; // コンバートボタンを有効化
+  } catch (error) {
+    logWithTimestamp(`メタデータの取得に失敗しました: ${error}`);
   }
-});
+};
 
 // FFmpegのログから進捗を解析するための関数
 const parseDuration = (log: string) => {
@@ -256,7 +284,6 @@ const processFile = async (
   );
 
   try {
-    // 映像処理
     await ffmpeg.run(
       "-i",
       "input.mp4", // 入力ファイル
@@ -265,7 +292,7 @@ const processFile = async (
       "-vf",
       `fps=${fps},scale=${resolution}`, // FPSと解像度の設定
       "-threads",
-      "4", // 4スレッドを使用
+      "1", // スレッド数を1に設定
       "-preset",
       "ultrafast", // エンコーディング速度優先
       `output_%03d.${videoFormat}` // 出力ファイル
@@ -408,40 +435,7 @@ const saveImageToText = async (
   });
 };
 
-// 文字列から4bit RGBA値をデコードする関数
-const charToRGBA = (char: string) => {
-  const charSet =
-    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  const to8bit = (value: number) => Math.floor((value / 15) * 255); // 0-15 -> 0-255 (8bit)
-
-  const r4 = charSet.indexOf(char[0]);
-  const g4 = charSet.indexOf(char[1]);
-  const b4 = charSet.indexOf(char[2]);
-  const a4 = charSet.indexOf(char[3]);
-
-  const r = to8bit(r4);
-  const g = to8bit(g4);
-  const b = to8bit(b4);
-  const a = to8bit(a4);
-
-  return [r, g, b, a];
-};
-
-// ピクセルデータをテキストから復元
-const convertTextToPixels = (txtData: string) => {
-  const pixels = new Uint8ClampedArray(txtData.length * 4);
-  for (let i = 0; i < txtData.length / 4; i++) {
-    const char = txtData.slice(i * 4, (i + 1) * 4);
-    const [r, g, b, a] = charToRGBA(char);
-    pixels[i * 4] = r;
-    pixels[i * 4 + 1] = g;
-    pixels[i * 4 + 2] = b;
-    pixels[i * 4 + 3] = a;
-  }
-  return pixels;
-};
-
-// テキストデータをもとに画像を生成してZIPに保存
+// txtファイルから画像を生成して保存する関数
 const saveTextToImage = async (
   zip: JSZip,
   txtFile: string,
@@ -468,18 +462,40 @@ const saveTextToImage = async (
   });
 };
 
-// txtファイルをアップロードし、画像に復元してZIPに保存する処理
-const processTextFile = async (
-  file: File,
-  zip: JSZip,
-  width: number,
-  height: number
-) => {
-  const fileName = file.name.split(".")[0];
-  const txtContent = await file.text();
-  await saveTextToImage(zip, txtContent, width, height, fileName);
+// 文字列から4bit RGBA値をデコードする関数
+const charToRGBA = (char: string) => {
+  const charSet =
+    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+  const to8bit = (value: number) => Math.floor((value / 15) * 255); // 0-15 -> 0-255 (8bit)
+
+  const r4 = charSet.indexOf(char[0]);
+  const g4 = charSet.indexOf(char[1]);
+  const b4 = charSet.indexOf(char[2]);
+  const a4 = charSet.indexOf(char[3]);
+
+  const r = to8bit(r4);
+  const g = to8bit(g4);
+  const b = to8bit(b4);
+  const a = to8bit(a4);
+
+  return [r, g, b, a];
 };
 
+// ピクセルデータをテキストから復元する関数
+const convertTextToPixels = (txtData: string) => {
+  const pixels = new Uint8ClampedArray(txtData.length * 4);
+  for (let i = 0; i < txtData.length / 4; i++) {
+    const char = txtData.slice(i * 4, (i + 1) * 4);
+    const [r, g, b, a] = charToRGBA(char);
+    pixels[i * 4] = r;
+    pixels[i * 4 + 1] = g;
+    pixels[i * 4 + 2] = b;
+    pixels[i * 4 + 3] = a;
+  }
+  return pixels;
+};
+
+// ZIPファイル内のメタデータを取得し、画像を復元する関数
 const processZipFile = async (file: File) => {
   const zip = await JSZip.loadAsync(file);
   const zipEntries = Object.keys(zip.files);
@@ -496,10 +512,30 @@ const processZipFile = async (file: File) => {
     // メタ情報を利用して画像を復元
     if (entryName.endsWith(".txt")) {
       const metaEntry = zip.file("meta.json");
-      const metaData = metaEntry ? await metaEntry.async("string") : null;
-      const { resolution, fps } = metaData
-        ? JSON.parse(metaData)
-        : { resolution: "640x360", fps: 30 };
+      let resolution: string;
+      let fps: number;
+
+      // メタ情報が存在するか確認
+      if (metaEntry) {
+        const metaData = await metaEntry.async("string");
+        const parsedMeta = JSON.parse(metaData);
+        resolution = parsedMeta.resolution;
+        fps = parsedMeta.fps;
+      } else {
+        // メタ情報がない場合は、元の動画ファイルから解像度とFPSを取得
+        const videoFile = zip.file("input.mp4"); // ここで実際の動画ファイル名を指定
+        if (!videoFile) {
+          throw new Error("Meta information and video file not found.");
+        }
+
+        const videoBlob = await videoFile.async("blob");
+        const videoFileObject = new File([videoBlob], "input.mp4");
+        const videoMeta = await getVideoMetadata(videoFileObject);
+
+        resolution = videoMeta.resolution;
+        fps = videoMeta.fps;
+      }
+
       const [width, height] = resolution.split("x").map(Number);
       await saveTextToImage(newZip, content, width, height, fileName);
     } else {
