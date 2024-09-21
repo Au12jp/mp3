@@ -1,18 +1,18 @@
-import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
+import { createFFmpeg, fetchFile, FFmpeg } from "@ffmpeg/ffmpeg";
 import JSZip from "jszip";
 
-// FFmpegの初期化
-const ffmpeg = createFFmpeg({
-  corePath:
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
-  log: true,
-});
+// FFmpegインスタンスを作成する関数
+const createFFmpegInstance = () => {
+  const ffmpeg = createFFmpeg({
+    corePath:
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js",
+    log: true,
+  });
+  ffmpeg.setLogger(ffmpegLogHandler);
+  return ffmpeg;
+};
 
 let totalDuration = 0;
-let videoMetadata = {
-  resolution: "",
-  fps: 0,
-};
 
 const fileInput = document.getElementById("fileInput") as HTMLInputElement;
 const convertButton = document.getElementById(
@@ -72,64 +72,290 @@ const logWithTimestamp = (message: string, isDetailed = false) => {
   }
 };
 
+// 音声を処理する関数
+const processAudio = async (
+  ffmpeg: any,
+  file: File,
+  audioFormat: string
+): Promise<Uint8Array> => {
+  logWithTimestamp(`音声を${audioFormat}形式で抽出しています...`);
+
+  // 入力ファイルを書き込む
+  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
+
+  try {
+    // 音声を抽出する
+    await ffmpeg.run(
+      "-i",
+      "input.mp4",
+      "-q:a",
+      "0",
+      "-map",
+      "a",
+      `output.${audioFormat}`
+    );
+    logWithTimestamp("音声の抽出が完了しました。");
+  } catch (error) {
+    logWithTimestamp(`音声抽出中にエラーが発生しました: ${error}`);
+    throw error;
+  }
+
+  // 抽出された音声データを取得
+  const audioData = ffmpeg.FS("readFile", `output.${audioFormat}`);
+  return audioData;
+};
+
+// 動画を指定した時間ごとに分割する関数
+const splitVideo = async (
+  ffmpeg: FFmpeg,
+  segmentDuration: number
+): Promise<string[]> => {
+  logWithTimestamp(`動画を${segmentDuration}秒ごとに分割しています...`);
+
+  await ffmpeg.run(
+    "-i",
+    "input.mp4", // 入力動画
+    "-c",
+    "copy", // 映像や音声の再エンコードなし
+    "-map",
+    "0", // すべてのストリームをマップ
+    "-segment_time",
+    segmentDuration.toString(), // セグメントごとの長さ (秒単位)
+    "-f",
+    "segment", // セグメント形式で出力
+    "segment_%03d.mp4" // 出力ファイル名フォーマット
+  );
+
+  logWithTimestamp("動画の分割が完了しました。");
+
+  // セグメントファイルの名前を手動で追跡
+  const segmentFiles: string[] = [];
+  for (let i = 0; ; i++) {
+    const segmentFileName = `segment_${String(i).padStart(3, "0")}.mp4`;
+    try {
+      ffmpeg.FS("readFile", segmentFileName); // ファイルの存在を確認
+      segmentFiles.push(segmentFileName);
+    } catch (error) {
+      break; // ファイルが見つからない場合は終了
+    }
+  }
+
+  return segmentFiles; // セグメントファイル名のリストを返す
+};
+
+// 分割された動画セグメントを並列処理する関数
+const processSegmentsWithMultipleFFmpeg = async (
+  segmentFiles: string[],
+  videoFormat: string,
+  resolution: string,
+  fps: string
+) => {
+  const processingPromises = [];
+
+  // セグメントファイルごとにFFmpegインスタンスを作成し、並列処理
+  for (const segmentFileName of segmentFiles) {
+    const ffmpegInstance = createFFmpegInstance(); // 新しいFFmpegインスタンス
+    await ffmpegInstance.load();
+    ffmpegInstance.setLogger(ffmpegLogHandler);
+
+    ffmpegInstance.FS(
+      "writeFile",
+      segmentFileName,
+      ffmpegInstance.FS("readFile", segmentFileName)
+    );
+
+    const processingPromise = ffmpegInstance
+      .run(
+        "-i",
+        segmentFileName, // 入力セグメント
+        "-vf",
+        `fps=${fps},scale=${resolution}`, // FPSと解像度の設定
+        `processed_${segmentFileName}.${videoFormat}` // 出力ファイル名
+      )
+      .then(() => {
+        return ffmpegInstance.FS(
+          "readFile",
+          `processed_${segmentFileName}.${videoFormat}`
+        );
+      });
+
+    processingPromises.push(processingPromise);
+  }
+
+  const processedFiles = await Promise.all(processingPromises);
+
+  logWithTimestamp("すべてのセグメントの処理が完了しました。");
+
+  return processedFiles;
+};
+
+// 使用例
+const processMp4FileInParallelWithMultipleFFmpeg = async (
+  file: File,
+  segmentDuration: number
+) => {
+  logWithTimestamp("MP4ファイルの分割と並列処理を開始します...");
+
+  const ffmpeg = createFFmpegInstance();
+  await ffmpeg.load();
+
+  // 音声と動画メタデータの取得
+  const { resolution, fps } = await getVideoMetadata(file);
+
+  // まず音声を処理
+  const audioData = await processAudio(ffmpeg, file, formatSelectAudio.value);
+  logWithTimestamp(`音声データの処理が完了しました。`);
+
+  // 動画を分割
+  const segmentFiles = await splitVideo(ffmpeg, segmentDuration);
+
+  // セグメントファイルを処理
+  const processedFiles = await processSegmentsWithMultipleFFmpeg(
+    segmentFiles,
+    formatSelectVideo.value,
+    resolution,
+    fps.toString()
+  );
+
+  logWithTimestamp("動画の分割と並列処理が完了しました。");
+  showCompleteModal(); // 処理完了時にモーダルを表示
+
+  // メタデータ作成
+  const metaData = {
+    audioFormat: formatSelectAudio.value,
+    videoFormat: formatSelectVideo.value,
+    resolution,
+    fps,
+  };
+
+  // ZIPにまとめる
+  const zip = new JSZip();
+  zip.file(`output.${formatSelectAudio.value}`, audioData); // 先に音声をZIPに追加
+  zip.file("meta.json", JSON.stringify(metaData)); // メタデータをZIPに追加
+  processedFiles.forEach((file, index) => {
+    zip.file(`processed_${index}.${formatSelectVideo.value}`, file);
+  });
+
+  const zipBlob = await zip.generateAsync({ type: "blob" });
+  const downloadLink = document.createElement("a");
+  downloadLink.href = URL.createObjectURL(zipBlob);
+  downloadLink.download = "processed_segments.zip";
+  downloadLink.textContent = "Download Processed Segments ZIP";
+  downloadLinkContainer.innerHTML = "";
+  downloadLinkContainer.appendChild(downloadLink);
+};
+
+// コンバートボタン押下時のイベントリスナー
+convertButton.addEventListener("click", async () => {
+  if (!fileInput.files?.length) return;
+
+  const segmentDuration = 10; // 10秒ごとに分割
+  await processMp4FileInParallelWithMultipleFFmpeg(
+    fileInput.files[0],
+    segmentDuration
+  );
+});
+
 // 動画ファイルからメタデータを取得する関数
 const getVideoMetadata = async (
   file: File
 ): Promise<{ resolution: string; fps: number }> => {
   return new Promise<{ resolution: string; fps: number }>(
     async (resolve, reject) => {
-      // FFmpegにファイルを読み込む
+      const ffmpeg = createFFmpegInstance();
+      await ffmpeg.load();
       ffmpeg.FS("writeFile", "temp.mp4", await fetchFile(file));
 
       let resolution = "";
       let fps = 0;
 
-      // メタデータ取得のためのFFmpegコマンドを実行
-      ffmpeg.setLogger(({ type, message }) => {
-        if (type === "fferr") {
-          // 解像度を取得
-          const resolutionMatch = message.match(/(\d{3,4}x\d{3,4})/);
-          if (resolutionMatch) {
-            resolution = resolutionMatch[0];
-          }
+      ffmpeg.setLogger(
+        ({ type, message }: { type: string; message: string }) => {
+          if (type === "fferr") {
+            const resolutionMatch = message.match(/(\d{3,4}x\d{3,4})/);
+            if (resolutionMatch) {
+              resolution = resolutionMatch[0];
+            }
 
-          // FPSを取得
-          const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
-          if (fpsMatch) {
-            fps = parseFloat(fpsMatch[1]);
+            const fpsMatch = message.match(/(\d+(?:\.\d+)?) fps/);
+            if (fpsMatch) {
+              fps = parseFloat(fpsMatch[1]);
+            }
           }
         }
-      });
+      );
 
-      // メタデータ取得用にFFmpegを実行
       await ffmpeg.run("-i", "temp.mp4");
 
-      // 解像度とFPSが取得できたらresolve
       if (resolution && fps) {
         resolve({ resolution, fps });
       } else {
         reject("Unable to extract metadata from video.");
       }
 
-      // 一時ファイルを削除
       ffmpeg.FS("unlink", "temp.mp4");
     }
   );
 };
 
-// FFmpegロード
-const loadFFmpeg = async () => {
-  if (!ffmpeg.isLoaded()) {
-    await ffmpeg.load();
-    logWithTimestamp("FFmpegがロードされました。");
+// FFmpegの進捗バーを表示する関数
+const parseProgress = (log: string) => {
+  const timeRegex = /time=(\d+):(\d+):(\d+\.\d+)/;
+  const match = timeRegex.exec(log);
+
+  if (match) {
+    const hours = parseFloat(match[1]);
+    const minutes = parseFloat(match[2]);
+    const seconds = parseFloat(match[3]);
+    const currentTime = hours * 3600 + minutes * 60 + seconds;
+
+    if (totalDuration > 0) {
+      const progress = (currentTime / totalDuration) * 100;
+      progressBar.value = progress;
+      progressPercent.textContent = `進捗: ${progress.toFixed(2)}%`;
+    }
   }
 };
 
-// ページロード時にFFmpegをプリロード
-window.addEventListener("load", () => {
-  logWithTimestamp("FFmpegをロード中...");
-  loadFFmpeg();
-});
+// メタデータから動画の合計時間を取得する関数
+const parseDuration = (log: string) => {
+  const durationRegex = /Duration: (\d+):(\d+):(\d+\.\d+)/;
+  const match = durationRegex.exec(log);
+
+  if (match) {
+    const hours = parseFloat(match[1]);
+    const minutes = parseFloat(match[2]);
+    const seconds = parseFloat(match[3]);
+    totalDuration = hours * 3600 + minutes * 60 + seconds;
+  }
+};
+
+// FFmpegのログを処理して進捗を表示
+const ffmpegLogHandler = ({
+  type,
+  message,
+}: {
+  type: string;
+  message: string;
+}) => {
+  if (type === "fferr") {
+    if (message.includes("Duration:")) {
+      parseDuration(message);
+    }
+    if (message.includes("time=")) {
+      parseProgress(message);
+    }
+    logWithTimestamp(message, true);
+  }
+};
+
+// 処理完了時にモーダルを表示する関数
+const showCompleteModal = () => {
+  modal.style.display = "block";
+  setTimeout(() => {
+    modal.style.display = "none";
+  }, 3000);
+};
 
 // ファイル選択時のイベントリスナー
 fileInput.addEventListener("change", async () => {
@@ -151,11 +377,9 @@ const processMp4File = async (file: File) => {
   try {
     const { resolution, fps } = await getVideoMetadata(file);
 
-    // 解像度とFPSをUIに反映
     document.getElementById("videoResolution")!.textContent = resolution;
     document.getElementById("videoFPS")!.textContent = fps.toString();
 
-    // 解像度の制限とUI設定
     const availableResolutions = [
       { value: "1920x1080", label: "1080p (Full HD)" },
       { value: "1280x720", label: "720p (HD)" },
@@ -164,9 +388,8 @@ const processMp4File = async (file: File) => {
     ];
 
     const maxResolution = resolution.split("x").map(Number);
-    resolutionSelect.innerHTML = ""; // 解像度の選択肢をクリア
+    resolutionSelect.innerHTML = "";
 
-    // 使用可能な解像度のみ追加
     availableResolutions.forEach((res) => {
       const resNumbers = res.value.split("x").map(Number);
       if (
@@ -180,197 +403,24 @@ const processMp4File = async (file: File) => {
       }
     });
 
-    // FPS設定
     fpsInput.value = Math.min(fps, 20).toString();
 
-    // 必要なUIを表示
     document.getElementById("videoInfo")!.style.display = "block";
     document.getElementById("formatSelection")!.style.display = "block";
     document.getElementById("videoSettings")!.style.display = "block";
     document.getElementById("statusContainer")!.style.display = "block";
     document.getElementById("progressContainer")!.style.display = "block";
     document.getElementById("convertButtonGroup")!.style.display = "block";
-    convertButton.disabled = false; // コンバートボタンを有効化
+    convertButton.disabled = false;
   } catch (error) {
     logWithTimestamp(`メタデータの取得に失敗しました: ${error}`);
   }
 };
 
-// FFmpegのログから進捗を解析するための関数
-const parseDuration = (log: string) => {
-  const durationRegex = /Duration: (\d+):(\d+):(\d+\.\d+)/;
-  const match = durationRegex.exec(log);
-
-  if (match) {
-    const hours = parseFloat(match[1]);
-    const minutes = parseFloat(match[2]);
-    const seconds = parseFloat(match[3]);
-    totalDuration = hours * 3600 + minutes * 60 + seconds;
-  }
-};
-
-const parseProgress = (log: string) => {
-  const timeRegex = /time=(\d+):(\d+):(\d+\.\d+)/;
-  const match = timeRegex.exec(log);
-
-  if (match) {
-    const hours = parseFloat(match[1]);
-    const minutes = parseFloat(match[2]);
-    const seconds = parseFloat(match[3]);
-    const currentTime = hours * 3600 + minutes * 60 + seconds;
-
-    // 進捗を計算して進捗バーを更新
-    if (totalDuration > 0) {
-      const progress = (currentTime / totalDuration) * 100;
-      progressBar.value = progress;
-      progressPercent.textContent = `進捗: ${progress.toFixed(2)}%`;
-    }
-  }
-};
-
-// FFmpegのログを処理して進捗を表示
-ffmpeg.setLogger(({ type, message }) => {
-  if (type === "fferr") {
-    // 初めにdurationを取得
-    if (message.includes("Duration:")) {
-      parseDuration(message);
-    }
-
-    // timeの進捗を取得
-    if (message.includes("time=")) {
-      parseProgress(message);
-    }
-
-    // 詳細ログにのみ表示
-    logWithTimestamp(message, true);
-  }
-});
-
-// ZIPファイルにoggとtxtを保存
-const processFile = async (
-  file: File,
-  audioFormat: string,
-  videoFormat: string,
-  resolution: string,
-  fps: string
-) => {
-  const fileName = file.name.split(".")[0];
-
-  // 入力ファイルをFFmpegに書き込む
-  ffmpeg.FS("writeFile", "input.mp4", await fetchFile(file));
-
-  logWithTimestamp(`音声を${audioFormat}形式で抽出しています...`);
-
-  try {
-    await ffmpeg.run(
-      "-i",
-      "input.mp4",
-      "-q:a",
-      "0",
-      "-map",
-      "a",
-      `output.${audioFormat}`
-    );
-    logWithTimestamp("音声の抽出が完了しました。");
-  } catch (error) {
-    logWithTimestamp(`音声抽出中にエラーが発生しました: ${error}`);
-  }
-
-  logWithTimestamp(
-    `映像を${fps}fps、${resolution}解像度、1Mbpsのビットレートで${videoFormat}形式に変換しています...`
-  );
-
-  try {
-    await ffmpeg.run(
-      "-i",
-      "input.mp4",
-      "-vf",
-      `fps=${fps},scale=${resolution}`,
-      `output_%03d.${videoFormat}`
-    );
-    logWithTimestamp("映像の変換が完了しました。");
-  } catch (error) {
-    logWithTimestamp(`映像変換中にエラーが発生しました: ${error}`);
-  }
-
-  // ZIPにまとめる
-  const zip = new JSZip();
-
-  // 音声ファイルをZIPに追加
-  const audioData = ffmpeg.FS("readFile", `output.${audioFormat}`);
-  zip.file(`sound.${audioFormat}`, audioData);
-
-  // メタ情報（解像度やFPS）を保存
-  const metaData = {
-    resolution,
-    fps,
-  };
-  zip.file("meta.json", JSON.stringify(metaData));
-
-  // PNGファイルをTXTファイルに変換してZIPに追加
-  let index = 1;
-  while (true) {
-    const fileName = `output_${String(index).padStart(3, "0")}`;
-    try {
-      const imageData = ffmpeg.FS("readFile", `${fileName}.${videoFormat}`);
-      await saveImageToText(zip, imageData, fileName);
-      index++;
-    } catch (error) {
-      break;
-    }
-  }
-
-  // ZIPを生成してダウンロードリンクを作成
-  const zipBlob = await zip.generateAsync({ type: "blob" });
-  const downloadLink = document.createElement("a");
-  downloadLink.href = URL.createObjectURL(zipBlob);
-  downloadLink.download = `${fileName}_audio_and_images.zip`;
-  downloadLink.textContent = "Download ZIPファイル";
-  downloadLink.classList.add("download-link");
-
-  downloadLinkContainer.innerHTML = "";
-  downloadLinkContainer.appendChild(downloadLink);
-
-  statusMessage.textContent = "変換が完了しました。";
-  convertButton.disabled = false;
-
-  // 処理完了後の通知
-  showCompleteModal();
-};
-// コンバートボタン押下時のイベントリスナー
-convertButton.addEventListener("click", async () => {
-  if (!fileInput.files?.length) return;
-
-  const audioFormat = formatSelectAudio.value;
-  const videoFormat = formatSelectVideo.value;
-  const resolution = resolutionSelect.value;
-  const fps = fpsInput.value;
-
-  convertButton.disabled = true;
-  statusMessage.textContent = "変換中...";
-
-  await processFile(
-    fileInput.files[0],
-    audioFormat,
-    videoFormat,
-    resolution,
-    fps
-  );
-});
-
-// 処理完了時にモーダルを表示する関数
-const showCompleteModal = () => {
-  modal.style.display = "block";
-  setTimeout(() => {
-    modal.style.display = "none";
-  }, 3000);
-};
-
 // RGBAを4bitに変換して1文字で表現するエンコード関数
-const rgbaToChar = (r: number, g: number, b: number, a: number) => {
+const rgbaToChar = (r: number, g: number, b: number, a: number): string => {
   const to4bit = (value: number) => Math.floor((value / 255) * 15); // 0-255 -> 0-15 (4bit)
 
-  // 16進数を使用して1文字で表現
   const charSet =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
   const r4 = to4bit(r);
@@ -378,19 +428,18 @@ const rgbaToChar = (r: number, g: number, b: number, a: number) => {
   const b4 = to4bit(b);
   const a4 = to4bit(a);
 
-  // 16進数の配列としてまとめる（例： "AB"）
   return charSet[r4] + charSet[g4] + charSet[b4] + charSet[a4];
 };
 
 // ピクセル情報をテキスト形式に変換
-const convertPixelsToText = (pixels: Uint8ClampedArray) => {
+const convertPixelsToText = (pixels: Uint8ClampedArray): string => {
   let txtData = "";
   for (let i = 0; i < pixels.length; i += 4) {
     const r = pixels[i];
     const g = pixels[i + 1];
     const b = pixels[i + 2];
     const a = pixels[i + 3];
-    txtData += rgbaToChar(r, g, b, a); // RGBAを文字列に変換
+    txtData += rgbaToChar(r, g, b, a);
   }
   return txtData;
 };
@@ -401,7 +450,6 @@ const saveImageToText = async (
   pngFile: Uint8Array,
   fileName: string
 ) => {
-  // FFmpegで画像を取り出す
   const blob = new Blob([pngFile], { type: "image/png" });
   const img = new Image();
   const imageUrl = URL.createObjectURL(blob);
@@ -434,13 +482,18 @@ const saveTextToImage = async (
   height: number,
   fileName: string
 ) => {
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     const pixelData = convertTextToPixels(txtFile);
 
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
-    const ctx = canvas.getContext("2d")!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      reject(new Error("Canvas context could not be created."));
+      return;
+    }
+
     const imageData = new ImageData(pixelData, width, height);
     ctx.putImageData(imageData, 0, 0);
 
@@ -448,13 +501,15 @@ const saveTextToImage = async (
       if (blob) {
         zip.file(`${fileName}.png`, blob);
         resolve();
+      } else {
+        reject(new Error("Blob creation failed."));
       }
     }, "image/png");
   });
 };
 
 // 文字列から4bit RGBA値をデコードする関数
-const charToRGBA = (char: string) => {
+const charToRGBA = (char: string): [number, number, number, number] => {
   const charSet =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
   const to8bit = (value: number) => Math.floor((value / 15) * 255); // 0-15 -> 0-255 (8bit)
@@ -473,7 +528,7 @@ const charToRGBA = (char: string) => {
 };
 
 // ピクセルデータをテキストから復元する関数
-const convertTextToPixels = (txtData: string) => {
+const convertTextToPixels = (txtData: string): Uint8ClampedArray => {
   const pixels = new Uint8ClampedArray(txtData.length * 4);
   for (let i = 0; i < txtData.length / 4; i++) {
     const char = txtData.slice(i * 4, (i + 1) * 4);
@@ -500,21 +555,18 @@ const processZipFile = async (file: File) => {
     const content = await entry.async("string");
     const fileName = entryName.split(".")[0];
 
-    // メタ情報を利用して画像を復元
     if (entryName.endsWith(".txt")) {
       const metaEntry = zip.file("meta.json");
       let resolution: string;
       let fps: number;
 
-      // メタ情報が存在するか確認
       if (metaEntry) {
         const metaData = await metaEntry.async("string");
         const parsedMeta = JSON.parse(metaData);
         resolution = parsedMeta.resolution;
         fps = parsedMeta.fps;
       } else {
-        // メタ情報がない場合は、元の動画ファイルから解像度とFPSを取得
-        const videoFile = zip.file("input.mp4"); // ここで実際の動画ファイル名を指定
+        const videoFile = zip.file("input.mp4");
         if (!videoFile) {
           throw new Error("Meta information and video file not found.");
         }
@@ -530,7 +582,8 @@ const processZipFile = async (file: File) => {
       const [width, height] = resolution.split("x").map(Number);
       await saveTextToImage(newZip, content, width, height, fileName);
     } else {
-      newZip.file(entryName, content);
+      const fileBlob = await entry.async("blob"); // バイナリデータとして処理する
+      newZip.file(entryName, fileBlob);
     }
   }
 
