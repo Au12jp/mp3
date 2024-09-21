@@ -262,17 +262,14 @@ const processFile = async (
   logWithTimestamp(`音声を${audioFormat}形式で抽出しています...`);
 
   try {
-    // 音声処理（音声のみ抽出）
     await ffmpeg.run(
       "-i",
-      "input.mp4", // 入力ファイル
+      "input.mp4",
       "-q:a",
-      "0", // 音声の最適化された品質
+      "0",
       "-map",
-      "a", // 音声のみを抽出
-      "-threads",
-      "4", // 4スレッドを使用
-      `output.${audioFormat}` // 出力ファイル
+      "a",
+      `output.${audioFormat}`
     );
     logWithTimestamp("音声の抽出が完了しました。");
   } catch (error) {
@@ -286,16 +283,10 @@ const processFile = async (
   try {
     await ffmpeg.run(
       "-i",
-      "input.mp4", // 入力ファイル
-      "-b:v",
-      "1M", // ビデオビットレートを1Mbpsに設定
+      "input.mp4",
       "-vf",
-      `fps=${fps},scale=${resolution}`, // FPSと解像度の設定
-      "-threads",
-      "1", // スレッド数を1に設定
-      "-preset",
-      "ultrafast", // エンコーディング速度優先
-      `output_%03d.${videoFormat}` // 出力ファイル
+      `fps=${fps},scale=${resolution}`,
+      `output_%03d.${videoFormat}`
     );
     logWithTimestamp("映像の変換が完了しました。");
   } catch (error) {
