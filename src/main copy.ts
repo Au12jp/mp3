@@ -94,7 +94,6 @@ fileInput.addEventListener("change", async () => {
   if (file.name.endsWith(".zip")) {
     logWithTimestamp("ZIPファイルを処理中...");
     // ZIP処理関数
-    await processZipFile(file);
   } else if (file.name.endsWith(".mp4")) {
     logWithTimestamp("MP4ファイルを処理中...");
 
@@ -233,47 +232,29 @@ const processFile = async (
 
   logWithTimestamp(`音声を${audioFormat}形式で抽出しています...`);
 
-  try {
-    // 音声処理（音声のみ抽出）
-    await ffmpeg.run(
-      "-i",
-      "input.mp4", // 入力ファイル
-      "-q:a",
-      "0", // 音声の最適化された品質
-      "-map",
-      "a", // 音声のみを抽出
-      "-threads",
-      "4", // 4スレッドを使用
-      `output.${audioFormat}` // 出力ファイル
-    );
-    logWithTimestamp("音声の抽出が完了しました。");
-  } catch (error) {
-    logWithTimestamp(`音声抽出中にエラーが発生しました: ${error}`);
-  }
-
-  logWithTimestamp(
-    `映像を${fps}fps、${resolution}解像度、1Mbpsのビットレートで${videoFormat}形式に変換しています...`
+  await ffmpeg.run(
+    "-i",
+    "input.mp4",
+    "-q:a",
+    "0",
+    "-map",
+    "a",
+    `output.${audioFormat}`
   );
 
-  try {
-    // 映像処理
-    await ffmpeg.run(
-      "-i",
-      "input.mp4", // 入力ファイル
-      "-b:v",
-      "1M", // ビデオビットレートを1Mbpsに設定
-      "-vf",
-      `fps=${fps},scale=${resolution}`, // FPSと解像度の設定
-      "-threads",
-      "4", // 4スレッドを使用
-      "-preset",
-      "ultrafast", // エンコーディング速度優先
-      `output_%03d.${videoFormat}` // 出力ファイル
-    );
-    logWithTimestamp("映像の変換が完了しました。");
-  } catch (error) {
-    logWithTimestamp(`映像変換中にエラーが発生しました: ${error}`);
-  }
+  logWithTimestamp(
+    `映像を${fps}fpsで${resolution}解像度に設定し、${videoFormat}形式で抽出しています...`
+  );
+
+  await ffmpeg.run(
+    "-i",
+    "input.mp4",
+    "-vf",
+    `fps=${fps},scale=${resolution}`,
+    `output_%03d.${videoFormat}`
+  );
+
+  logWithTimestamp("変換が完了しました。");
 
   // ZIPにまとめる
   const zip = new JSZip();
@@ -478,40 +459,4 @@ const processTextFile = async (
   const fileName = file.name.split(".")[0];
   const txtContent = await file.text();
   await saveTextToImage(zip, txtContent, width, height, fileName);
-};
-
-const processZipFile = async (file: File) => {
-  const zip = await JSZip.loadAsync(file);
-  const zipEntries = Object.keys(zip.files);
-
-  const newZip = new JSZip();
-
-  for (const entryName of zipEntries) {
-    const entry = zip.file(entryName);
-    if (!entry) continue;
-
-    const content = await entry.async("string");
-    const fileName = entryName.split(".")[0];
-
-    // メタ情報を利用して画像を復元
-    if (entryName.endsWith(".txt")) {
-      const metaEntry = zip.file("meta.json");
-      const metaData = metaEntry ? await metaEntry.async("string") : null;
-      const { resolution, fps } = metaData
-        ? JSON.parse(metaData)
-        : { resolution: "640x360", fps: 30 };
-      const [width, height] = resolution.split("x").map(Number);
-      await saveTextToImage(newZip, content, width, height, fileName);
-    } else {
-      newZip.file(entryName, content);
-    }
-  }
-
-  const zipBlob = await newZip.generateAsync({ type: "blob" });
-  const downloadLink = document.createElement("a");
-  downloadLink.href = URL.createObjectURL(zipBlob);
-  downloadLink.download = "restored_images.zip";
-  downloadLink.textContent = "Download Restored ZIP";
-  downloadLinkContainer.innerHTML = "";
-  downloadLinkContainer.appendChild(downloadLink);
 };
